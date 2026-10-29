@@ -31,7 +31,7 @@ class User extends Authenticatable
     }
 
     protected $fillable = [
-    'name', 'email', 'password', 'role', 'department_id', 'roll_number', 'current_semester_id','class_group_id',
+    'name', 'email', 'password', 'role', 'department_id', 'roll_number', 'current_semester_id','class_group_id','academic_status',
 ];
 
 public function department()

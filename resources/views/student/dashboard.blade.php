@@ -24,6 +24,36 @@
                 </div>
             @endunless
 
+            @if ($student->academic_status === 'failed')
+    <div class="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-800">
+        <x-icon name="exclamation-triangle" class="h-5 w-5" />
+        You have used all chances in a subject and failed it (complete failure). Please contact the administration.
+    </div>
+@elseif ($student->academic_status === 'graduated')
+    <div class="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-sm text-emerald-800">
+        <x-icon name="check-circle" class="h-5 w-5" />
+        Congratulations, you have completed all semesters and graduated.
+    </div>
+@endif
+
+@if ($retakes->isNotEmpty())
+    <x-panel title="Retake exams waiting for a new mark">
+        <ul class="divide-y divide-gray-100">
+            @foreach ($retakes as $retake)
+                <li class="flex items-center justify-between px-6 py-3 text-sm">
+                    <span class="text-gray-900">
+                        {{ $retake->subject->code }} - {{ $retake->subject->name }}
+                        <span class="text-gray-500">({{ $retake->subject->teacher?->name ?? 'No teacher' }})</span>
+                    </span>
+                    <span class="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+                        Chance {{ $retake->chance }} of {{ \App\Models\Grade::MAX_CHANCES }}
+                    </span>
+                </li>
+            @endforeach
+        </ul>
+    </x-panel>
+@endif
+
             @if ($failedCount > 0)
                 <div class="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-sm text-red-800">
                     <x-icon name="exclamation-triangle" class="h-5 w-5" />

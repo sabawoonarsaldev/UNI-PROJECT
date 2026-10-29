@@ -18,20 +18,18 @@ class SubjectController extends Controller
         return view('teacher.subjects.index', compact('subjects'));
     }
 
+   
     public function show(Subject $subject)
-    {
-        // A teacher can only open his or her own subjects
-        abort_unless($subject->teacher_id == auth()->id(), 403);
+{
+    // A teacher can only open his or her own subjects
+    abort_unless($subject->teacher_id == auth()->id(), 403);
 
-        $subject->load(['department', 'semester', 'schedules']);
+    $subject->load(['department', 'semester', 'schedules']);
 
-        $enrollments = $subject->enrollments()
-            ->with('student')
-            ->get()
-            ->sortBy(fn ($enrollment) => $enrollment->student->name);
+    $rows = $subject->gradebook();
 
-        $grades = $subject->grades()->get()->keyBy('student_id');
+    return view('teacher.subjects.show', compact('subject', 'rows'));
+}
 
-        return view('teacher.subjects.show', compact('subject', 'enrollments', 'grades'));
-    }
+
 }

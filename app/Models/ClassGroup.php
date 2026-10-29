@@ -124,4 +124,64 @@ class ClassGroup extends Model
 
         return $next;
     }
+
+    // Looks at the results of the completed semesters:
+// - a failed subject gets the next chance
+// - a failure in the last chance is a complete failure of the student
+// - after the last semester, a student without open subjects graduates
+public function evaluate(): array
+{
+    $summary = ['retakes' => 0, 'failed' => 0, 'graduated' => 0];
+
+    $students = $this->students()->where('academic_status', 'active')->get();
+
+    foreach ($students as $student) {
+        $subjects = Enrollment::where('student_id', $student->id)
+            ->whereHas('subject.semester', fn ($query) => $query->where('is_active', false))
+            ->with('grade')
+            ->get()
+            ->groupBy('subject_id');
+
+        $completelyFailed = false;
+        $hasOpenSubject = false;
+
+        foreach ($subjects as $enrollments) {
+            $latest = $enrollments->sortByDesc('chance')->first();
+
+            if (! $latest->grade) {
+                $hasOpenSubject = true; // a retake that is waiting for its mark
+                continue;
+            }
+
+            if ($latest->grade->marks >= Grade::PASS_MARK) {
+                continue;
+            }
+
+            if ($latest->chance < Grade::MAX_CHANCES) {
+                Enrollment::create([
+                    'student_id' => $student->id,
+                    'subject_id' => $latest->subject_id,
+                    'semester_id' => $latest->semester_id,
+                    'chance' => $latest->chance + 1,
+                ]);
+
+                $summary['retakes']++;
+                $hasOpenSubject = true;
+            } else {
+                $completelyFailed = true;
+            }
+        }
+
+        if ($completelyFailed) {
+            $student->update(['academic_status' => 'failed']);
+            $summary['failed']++;
+        } elseif ($this->status === 'completed' && ! $hasOpenSubject && $subjects->isNotEmpty()) {
+            $student->update(['academic_status' => 'graduated']);
+            $summary['graduated']++;
+        }
+    }
+
+    return $summary;
+}
+
 }

@@ -8,6 +8,7 @@ use App\Models\Grade;
 use App\Models\User;
 use App\Services\GpaCalculator;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ReportController extends Controller
 {
@@ -17,10 +18,18 @@ class ReportController extends Controller
 
         // A fresh query each time, optionally limited to one department
         $grades = fn () => Grade::query()
+            // Only the latest chance of every student in every subject counts
+            ->whereNotExists(function ($query) {
+                $query->select(DB::raw(1))
+                    ->from('grades as newer')
+                    ->whereColumn('newer.student_id', 'grades.student_id')
+                    ->whereColumn('newer.subject_id', 'grades.subject_id')
+                    ->whereColumn('newer.chance', '>', 'grades.chance');
+            })
             ->when($departmentId, fn ($query) => $query->whereHas(
                 'subject', fn ($subject) => $subject->where('department_id', $departmentId)
             ));
-
+            
         $totalGrades = $grades()->count();
         $passedGrades = $grades()->where('marks', '>=', Grade::PASS_MARK)->count();
 

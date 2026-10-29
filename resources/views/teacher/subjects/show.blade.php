@@ -39,49 +39,60 @@
             </div>
 
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-                    <span class="font-semibold text-gray-800">Students ({{ $enrollments->count() }})</span>
+    <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+        <span class="font-semibold text-gray-800">
+            Students ({{ $rows->pluck('student_id')->unique()->count() }})
+        </span>
 
-                    @if ($subject->semester->is_active && $enrollments->isNotEmpty())
-                        <a href="{{ route('teacher.grades.edit', $subject) }}"
-                           class="px-3 py-1 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
-                            Enter / Edit Grades
-                        </a>
-                    @endif
-                </div>
+        @if ($rows->contains('editable', true))
+            <a href="{{ route('teacher.grades.edit', $subject) }}"
+               class="px-3 py-1 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
+                Enter / Edit Grades
+            </a>
+        @endif
+    </div>
 
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">#</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Roll No.</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Marks</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Grade</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-200">
-                        @forelse ($enrollments as $enrollment)
-                            @php($grade = $grades->get($enrollment->student_id))
-                            <tr>
-                                <td class="px-6 py-4 text-sm text-gray-500">{{ $loop->iteration }}</td>
-                                <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ $enrollment->student->name }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-500">{{ $enrollment->student->roll_number ?? '-' }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-500">{{ $enrollment->student->email }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-900">{{ $grade ? (float) $grade->marks : '-' }}</td>
-                                <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ $grade?->grade_letter ?? '-' }}</td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="6" class="px-6 py-8 text-center text-gray-500">
-                                    No students are enrolled in this subject yet. Please contact the admin.
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+            <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Roll No.</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Chance</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Marks</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Grade</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+            @forelse ($rows as $enrollment)
+                @php($grade = $enrollment->grade)
+                <tr>
+                    <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ $enrollment->student->name }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-500">{{ $enrollment->student->roll_number ?? '-' }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-500">
+                        @if ($enrollment->chance > 1)
+                            <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                                Chance {{ $enrollment->chance }}
+                            </span>
+                        @else
+                            1
+                        @endif
+                    </td>
+                    <td class="px-6 py-4 text-sm {{ $grade && $grade->marks < \App\Models\Grade::PASS_MARK ? 'text-red-600 font-semibold' : 'text-gray-900' }}">
+                        {{ $grade ? (float) $grade->marks : '-' }}
+                    </td>
+                    <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ $grade?->grade_letter ?? '-' }}</td>
+                </tr>
+            @empty
+                <tr>
+                    <td colspan="5" class="px-6 py-8 text-center text-gray-500">
+                        No students are enrolled in this subject yet. Please contact the admin.
+                    </td>
+                </tr>
+            @endforelse
+        </tbody>
+    </table>
+</div>
+
         </div>
     </div>
 </x-app-layout>

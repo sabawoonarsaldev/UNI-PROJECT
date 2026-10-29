@@ -29,11 +29,21 @@ class DashboardController extends Controller
             ->sortBy('sort_key')
             ->values();
 
-        $passedCredits = $grades
+        $latest = GpaCalculator::latest($grades);
+
+        $passedCredits = $latest
             ->filter(fn ($grade) => $grade->marks >= Grade::PASS_MARK)
             ->sum(fn ($grade) => $grade->subject->credit_hours);
 
-        $failedCount = $grades->filter(fn ($grade) => $grade->marks < Grade::PASS_MARK)->count();
+        $failedCount = $latest->filter(fn ($grade) => $grade->marks < Grade::PASS_MARK)->count();
+
+        // Retakes that are waiting for a new mark
+        $retakes = $student->enrollments()
+            ->where('chance', '>', 1)
+            ->doesntHave('grade')
+            ->with('subject.teacher')
+            ->get();
+
 
         // Subjects of the current semester, with the grade (if any)
         $enrollments = $student->enrollments()
@@ -58,7 +68,7 @@ class DashboardController extends Controller
 
         return view('student.dashboard', compact(
             'student', 'cgpa', 'semesterGpas', 'passedCredits', 'failedCount',
-            'enrollments', 'currentGrades', 'todayClasses', 'announcements', 'unreadMessages'
+            'enrollments', 'currentGrades', 'todayClasses', 'announcements', 'unreadMessages','retakes'
         ));
     }
 }

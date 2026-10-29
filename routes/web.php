@@ -84,6 +84,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
         Route::get('configuration', [ConfigurationController::class, 'index'])->name('configuration.index');
         Route::resource('semester-types', SemesterTypeController::class)->only(['index', 'store', 'update', 'destroy']);
+        Route::post('classes/{classGroup}/process-results', [ClassGroupController::class, 'processResults'])->name('classes.process-results');
         });
 
     Route::middleware(['role:teacher'])->prefix('teacher')->name('teacher.')->group(function () {

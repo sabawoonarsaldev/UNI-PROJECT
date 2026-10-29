@@ -36,6 +36,15 @@
                             Results
                         </a>
 
+                        <form action="{{ route('admin.classes.process-results', $classGroup) }}" method="POST"
+                            onsubmit="return confirm('Process the results? Failed subjects will move to the next chance.');">
+                            @csrf
+                            <button type="submit"
+                                    class="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                Process results
+                            </button>
+                        </form>
+
                         @if ($classGroup->status === 'active')
                             <form action="{{ route('admin.classes.complete-semester', $classGroup) }}" method="POST"
                                   onsubmit="return confirm('Complete {{ $currentSemester->name }}? All grades of this semester will be locked and the class will move to the next semester.');">
@@ -111,45 +120,57 @@
             @endif
 
             {{-- Students of the class --}}
-            <x-panel :title="'Students (' . $students->count() . ')'">
-                <table class="min-w-full divide-y divide-gray-100">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Name</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Roll No.</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Email</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100">
-                        @forelse ($students as $student)
-                            <tr>
-                                <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ $student->name }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-500">{{ $student->roll_number ?? '-' }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-500">{{ $student->email }}</td>
-                                <td class="px-6 py-4 text-right text-sm">
-                                    @if ($student->grades_count === 0)
-                                        <form action="{{ route('admin.classes.students.remove', [$classGroup, $student]) }}" method="POST"
-                                              class="inline" onsubmit="return confirm('Remove this student from the class?');">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="text-red-600 hover:underline">Remove</button>
-                                        </form>
-                                    @else
-                                        <span class="text-xs text-gray-400">Has grades</span>
-                                    @endif
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="4" class="px-6 py-8 text-center text-sm text-gray-500">
-                                    No students in this class yet.
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </x-panel>
+<x-panel :title="'Students (' . $students->count() . ')'">
+    @php($statusStyles = [
+        'active' => ['Active', 'bg-green-100 text-green-800'],
+        'graduated' => ['Graduated', 'bg-blue-100 text-blue-800'],
+        'failed' => ['Complete failure', 'bg-red-100 text-red-700'],
+    ])
+
+    <table class="min-w-full divide-y divide-gray-100">
+        <thead class="bg-gray-50">
+            <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Name</th>
+                <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Roll No.</th>
+                <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Status</th>
+                <th class="px-6 py-3 text-left text-xs font-medium uppercase text-gray-500">Retakes waiting</th>
+                <th class="px-6 py-3 text-right text-xs font-medium uppercase text-gray-500">Actions</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100">
+            @forelse ($students as $student)
+                @php([$statusLabel, $statusClass] = $statusStyles[$student->academic_status])
+                <tr>
+                    <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ $student->name }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-500">{{ $student->roll_number ?? '-' }}</td>
+                    <td class="px-6 py-4 text-sm">
+                        <span class="rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $statusClass }}">{{ $statusLabel }}</span>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-500">{{ $student->pending_retakes_count }}</td>
+                    <td class="px-6 py-4 text-right text-sm">
+                        @if ($student->grades_count === 0)
+                            <form action="{{ route('admin.classes.students.remove', [$classGroup, $student]) }}" method="POST"
+                                  class="inline" onsubmit="return confirm('Remove this student from the class?');">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="text-red-600 hover:underline">Remove</button>
+                            </form>
+                        @else
+                            <span class="text-xs text-gray-400">Has grades</span>
+                        @endif
+                    </td>
+                </tr>
+            @empty
+                <tr>
+                    <td colspan="5" class="px-6 py-8 text-center text-sm text-gray-500">
+                        No students in this class yet.
+                    </td>
+                </tr>
+            @endforelse
+        </tbody>
+    </table>
+</x-panel>
+
 
             {{-- Add students --}}
             @if ($classGroup->status === 'active')

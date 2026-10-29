@@ -23,6 +23,7 @@
                                 <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">CGPA</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Percentage</th>
                                 <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Failed subjects</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Status</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
@@ -48,10 +49,14 @@
                                             <span class="text-gray-400">0</span>
                                         @endif
                                     </td>
+                                    <td class="px-4 py-3 text-sm">
+                                        @php($label = ['active' => ['Active', 'bg-green-100 text-green-800'], 'graduated' => ['Graduated', 'bg-blue-100 text-blue-800'], 'failed' => ['Complete failure', 'bg-red-100 text-red-700']][$row['student']->academic_status])
+                                        <span class="rounded-full px-2.5 py-0.5 text-xs font-semibold {{ $label[1] }}">{{ $label[0] }}</span>
+                                    </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="{{ 5 + $classGroup->semesters->count() }}" class="px-6 py-8 text-center text-sm text-gray-500">
+                                    <td colspan="{{ 6 + $classGroup->semesters->count() }}" class="px-6 py-8 text-center text-sm text-gray-500">
                                         No students in this class yet.
                                     </td>
                                 </tr>
@@ -95,6 +100,9 @@
                                             @php($grade = $detailGrades->get($row['student']->id)?->get($subject->id))
                                             <td class="px-4 py-3 text-sm {{ $grade && $grade->marks < \App\Models\Grade::PASS_MARK ? 'font-semibold text-red-600' : 'text-gray-700' }}">
                                                 {{ $grade ? (float) $grade->marks : '-' }}
+                                                @if ($grade && $grade->chance > 1)
+                                                    <span class="text-xs text-amber-600">(chance {{ $grade->chance }})</span>
+                                                @endif
                                             </td>
                                         @endforeach
                                     </tr>

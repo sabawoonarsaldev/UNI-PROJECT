@@ -8,7 +8,6 @@ use App\Models\Enrollment;
 use App\Models\Subject;
 use App\Models\User;
 use Illuminate\Http\Request;
-use App\Models\Grade;
 
 class EnrollmentController extends Controller
 {
@@ -72,28 +71,23 @@ class EnrollmentController extends Controller
             ->with('success', $ids->count() . ' student(s) enrolled successfully.');
     }
 
-    // Remove one student from the subject
+    // Remove one enrollment together with its grade
     public function destroy(Enrollment $enrollment)
     {
         $subject = $enrollment->subject;
 
-        // The grade of this student in this subject must not stay behind
-        Grade::where([
-            'student_id' => $enrollment->student_id,
-            'subject_id' => $enrollment->subject_id,
-            'semester_id' => $enrollment->semester_id,
-        ])->delete();
-
+        $enrollment->grade?->delete();
         $enrollment->delete();
 
         return redirect()->route('admin.enrollments.manage', $subject)
-            ->with('success', 'Student removed from the subject.');
+            ->with('success', 'Enrollment removed.');
     }
 
-    // Students of the same department and semester who are not enrolled yet
+    // Active students of the class of this subject who are not enrolled yet
     private function eligibleStudents(Subject $subject)
     {
         return User::where('role', 'student')
+            ->where('academic_status', 'active')
             ->whereNotNull('class_group_id')
             ->where('class_group_id', $subject->semester->class_group_id)
             ->whereDoesntHave('enrollments', fn ($query) => $query->where('subject_id', $subject->id))

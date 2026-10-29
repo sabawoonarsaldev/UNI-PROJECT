@@ -6,8 +6,17 @@ use Illuminate\Database\Eloquent\Model;
 
 class Grade extends Model
 {
-    protected $fillable = ['student_id', 'subject_id', 'semester_id', 'marks', 'grade_letter'];
+    protected $fillable = [
+    'enrollment_id', 'student_id', 'subject_id', 'semester_id', 'chance', 'marks', 'grade_letter',
+    ];
 
+    protected $casts = ['chance' => 'integer'];
+
+    public function enrollment()
+    {
+        return $this->belongsTo(Enrollment::class);
+    }
+    
     public function student()
     {
         return $this->belongsTo(User::class, 'student_id');
@@ -23,6 +32,8 @@ class Grade extends Model
         return $this->belongsTo(Semester::class);
     }
 
+
+public const MAX_CHANCES = 4;
 public const PASS_MARK = 55;
 
 public static function letterFor(float $marks): string

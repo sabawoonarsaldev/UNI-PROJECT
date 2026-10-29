@@ -39,9 +39,10 @@ class SubjectController extends Controller
         $subject = Subject::create($this->validated($request));
 
         // Every student of the class is enrolled in the new subject automatically
-        $studentIds = User::where('role', 'student')
-            ->where('class_group_id', $subject->semester->class_group_id)
-            ->pluck('id');
+    $studentIds = User::where('role', 'student')
+        ->where('academic_status', 'active')
+        ->where('class_group_id', $subject->semester->class_group_id)
+        ->pluck('id');
 
         foreach ($studentIds as $studentId) {
             Enrollment::firstOrCreate([

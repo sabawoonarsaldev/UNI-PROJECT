@@ -7,6 +7,14 @@ use Illuminate\Support\Collection;
 
 class GpaCalculator
 {
+    // Only the latest chance of every subject counts
+    public static function latest(Collection $grades): Collection
+    {
+        return $grades->groupBy('subject_id')
+            ->map(fn ($attempts) => $attempts->sortByDesc('chance')->first())
+            ->values();
+    }
+
     // $grades: a collection of Grade models with the "subject" relation loaded.
     // GPA is weighted by credit hours. Subjects without a grade are ignored.
     public static function gpa(Collection $grades): ?float
@@ -14,7 +22,7 @@ class GpaCalculator
         $credits = 0;
         $points = 0;
 
-        foreach ($grades as $grade) {
+        foreach (self::latest($grades) as $grade) {
             if ($grade->grade_letter === null) {
                 continue;
             }
@@ -33,7 +41,7 @@ class GpaCalculator
         $credits = 0;
         $total = 0;
 
-        foreach ($grades as $grade) {
+        foreach (self::latest($grades) as $grade) {
             if ($grade->marks === null) {
                 continue;
             }

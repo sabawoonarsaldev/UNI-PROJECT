@@ -61,6 +61,9 @@
                                 <tr>
                                     <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ $grade->subject->code }}</td>
                                     <td class="px-6 py-4 text-sm text-gray-900">{{ $grade->subject->name }}</td>
+                                    @if ($grade->chance > 1)
+                                        <span class="ms-1 text-xs text-amber-600">(chance {{ $grade->chance }})</span>
+                                    @endif
                                     <td class="px-6 py-4 text-sm text-gray-500">{{ $grade->subject->credit_hours }}</td>
                                     <td class="px-6 py-4 text-sm text-gray-900">{{ (float) $grade->marks }}</td>
                                     <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ $grade->grade_letter }}</td>

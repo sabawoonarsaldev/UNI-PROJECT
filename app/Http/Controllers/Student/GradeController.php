@@ -16,14 +16,18 @@ class GradeController extends Controller
 
         // One block per semester, each with its own GPA and average
         $semesters = $grades->groupBy('semester_id')
-            ->map(fn ($semesterGrades) => [
-                'semester' => $semesterGrades->first()->semester,
-                'grades' => $semesterGrades->sortBy(fn ($grade) => $grade->subject->code),
-                'gpa' => GpaCalculator::gpa($semesterGrades),
-                'average' => GpaCalculator::average($semesterGrades),
-                'credits' => $semesterGrades->sum(fn ($grade) => $grade->subject->credit_hours),
-            ])
-            ->sortBy(fn ($item) => $item['semester']->sort_key)            
+            ->map(function ($semesterGrades) {
+                $final = GpaCalculator::latest($semesterGrades);
+
+                return [
+                    'semester' => $semesterGrades->first()->semester,
+                    'grades' => $final->sortBy(fn ($grade) => $grade->subject->code),
+                    'gpa' => GpaCalculator::gpa($semesterGrades),
+                    'average' => GpaCalculator::average($semesterGrades),
+                    'credits' => $final->sum(fn ($grade) => $grade->subject->credit_hours),
+                ];
+            })
+            ->sortBy(fn ($item) => $item['semester']->sort_key)
             ->values();
 
         $cgpa = GpaCalculator::gpa($grades);

@@ -29,67 +29,46 @@ class GradeController extends Controller
         return view('admin.grades.index', compact('subjects', 'departments'));
     }
 
-    // The grades of one subject, with a form to correct them
+
     public function show(Subject $subject)
-    {
-        $subject->load(['department', 'semester', 'teacher']);
+{
+    $subject->load(['department', 'semester', 'teacher']);
 
-        $enrollments = $subject->enrollments()
-            ->with('student')
-            ->get()
-            ->sortBy(fn ($enrollment) => $enrollment->student->name);
+    $rows = $subject->gradebook(true);
 
-        $grades = $subject->grades()->get()->keyBy('student_id');
+    // The statistics use the latest graded chance of every student
+    $latestGrades = $rows->groupBy('student_id')
+        ->map(fn ($attempts) => $attempts->sortByDesc('chance')->pluck('grade')->filter()->first())
+        ->filter();
 
-        // Statistics are calculated only from the enrolled students
-        $marks = $enrollments
-            ->map(fn ($enrollment) => $grades->get($enrollment->student_id))
-            ->filter()
-            ->map(fn ($grade) => (float) $grade->marks);
+    $marks = $latestGrades->map(fn ($grade) => (float) $grade->marks);
 
-        $stats = [
-            'enrolled' => $enrollments->count(),
-            'graded' => $marks->count(),
-            'average' => $marks->isNotEmpty() ? round($marks->avg(), 2) : null,
-            'highest' => $marks->isNotEmpty() ? $marks->max() : null,
-            'lowest' => $marks->isNotEmpty() ? $marks->min() : null,
-            'pass_rate' => $marks->isNotEmpty()
-                ? round($marks->filter(fn ($mark) => $mark >= Grade::PASS_MARK)->count() / $marks->count() * 100, 1)
-                : null,
-        ];
+    $stats = [
+        'enrolled' => $rows->pluck('student_id')->unique()->count(),
+        'graded' => $marks->count(),
+        'average' => $marks->isNotEmpty() ? round($marks->avg(), 2) : null,
+        'highest' => $marks->isNotEmpty() ? $marks->max() : null,
+        'lowest' => $marks->isNotEmpty() ? $marks->min() : null,
+        'pass_rate' => $marks->isNotEmpty()
+            ? round($marks->filter(fn ($mark) => $mark >= Grade::PASS_MARK)->count() / $marks->count() * 100, 1)
+            : null,
+    ];
 
-        return view('admin.grades.show', compact('subject', 'enrollments', 'grades', 'stats'));
-    }
+    return view('admin.grades.show', compact('subject', 'rows', 'stats'));
+}
 
-    // The admin may correct grades even when the semester is closed
-    public function update(Request $request, Subject $subject)
-    {
-        $request->validate([
-            'marks' => 'array',
-            'marks.*' => 'nullable|numeric|min:0|max:100',
-        ]);
+// The admin may change the latest chance of any student, even when the semester is closed
+public function update(Request $request, Subject $subject)
+{
+    $request->validate([
+        'marks' => 'array',
+        'marks.*' => 'nullable|numeric|min:0|max:100',
+    ]);
 
-        foreach ($subject->enrollments as $enrollment) {
-            $marks = $request->input("marks.{$enrollment->student_id}");
+    $subject->saveGrades($subject->gradebook(true), $request->input('marks', []));
 
-            $keys = [
-                'student_id' => $enrollment->student_id,
-                'subject_id' => $subject->id,
-                'semester_id' => $subject->semester_id,
-            ];
+    return redirect()->route('admin.grades.show', $subject)
+        ->with('success', 'Grades saved successfully.');
+}
 
-            if ($marks === null || $marks === '') {
-                Grade::where($keys)->delete();
-                continue;
-            }
-
-            Grade::updateOrCreate($keys, [
-                'marks' => $marks,
-                'grade_letter' => Grade::letterFor((float) $marks),
-            ]);
-        }
-
-        return redirect()->route('admin.grades.show', $subject)
-            ->with('success', 'Grades saved successfully.');
-    }
 }

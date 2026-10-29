@@ -6,7 +6,15 @@ use Illuminate\Database\Eloquent\Model;
 
 class Enrollment extends Model
 {
-    protected $fillable = ['student_id', 'subject_id', 'semester_id'];
+    
+    protected $fillable = ['student_id', 'subject_id', 'semester_id', 'chance'];
+
+    protected $casts = ['chance' => 'integer'];
+
+    public function grade()
+    {
+        return $this->hasOne(Grade::class);
+    }
 
     public function student()
     {
