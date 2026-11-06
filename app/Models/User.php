@@ -31,7 +31,7 @@ class User extends Authenticatable
     }
 
     protected $fillable = [
-    'name', 'email', 'password', 'role', 'department_id', 'roll_number', 'current_semester_id','class_group_id','academic_status',
+    'name', 'email', 'password', 'role', 'department_id', 'roll_number', 'current_semester_id','class_group_id','academic_status','supervisor_id'
 ];
 
 public function department()
@@ -69,6 +69,50 @@ public function unreadMessagesCount(): int
 public function classGroup()
 {
     return $this->belongsTo(ClassGroup::class);
+}
+
+public function hasAccount(): bool
+{
+    return ! is_null($this->password);
+}
+
+public function scopeWithAccount($query)
+{
+    return $query->whereNotNull('password');
+}
+
+public function supervisor()
+{
+    return $this->belongsTo(User::class, 'supervisor_id');
+}
+
+public function supervisedStudents()
+{
+    return $this->hasMany(User::class, 'supervisor_id');
+}
+
+public function project()
+{
+    return $this->hasOne(Project::class, 'student_id');
+}
+
+// Every word must be found in the name, email, roll number or department name
+public function scopeSearch($query, ?string $term)
+{
+    $words = collect(preg_split('/\s+/u', trim((string) $term)))->filter()->take(6);
+
+    foreach ($words as $word) {
+        $like = '%' . str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], $word) . '%';
+
+        $query->where(function ($q) use ($like) {
+            $q->where('name', 'like', $like)
+                ->orWhere('email', 'like', $like)
+                ->orWhere('roll_number', 'like', $like)
+                ->orWhereHas('department', fn ($department) => $department->where('name', 'like', $like));
+        });
+    }
+
+    return $query;
 }
 
 }

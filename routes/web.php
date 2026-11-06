@@ -31,6 +31,14 @@ use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\ConfigurationController;
 use App\Http\Controllers\Admin\SemesterTypeController;
 use App\Http\Controllers\Admin\ClassGroupController;
+# Project Management 
+use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\ProjectFileController;
+use App\Http\Controllers\ProjectCommentController;
+use App\Http\Controllers\RepositoryController;
+use App\Http\Controllers\Admin\ProjectController as AdminProjectController;
+use App\Http\Controllers\Admin\SupervisionController;
+use App\Http\Controllers\Teacher\ProjectController as TeacherProjectController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -55,6 +63,24 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('messages/start', [MessageController::class, 'start'])->name('messages.start');
     Route::get('messages/{user}', [MessageController::class, 'show'])->name('messages.show');
     Route::post('messages/{user}', [MessageController::class, 'store'])->name('messages.store');
+
+
+    // Project repository: every logged-in user can search the approved projects
+    Route::get('repository', [RepositoryController::class, 'index'])->name('repository.index');
+    Route::get('repository/{project}', [RepositoryController::class, 'show'])->name('repository.show');
+
+// Project workspace: student, supervisor and admin (ProjectPolicy checks who may do what)
+    Route::get('projects/{project}', [ProjectController::class, 'show'])->name('projects.show');
+    Route::put('projects/{project}', [ProjectController::class, 'update'])->name('projects.update');
+    Route::post('projects/{project}/submit', [ProjectController::class, 'submit'])->name('projects.submit');
+    Route::post('projects/{project}/supervisor-approve', [ProjectController::class, 'supervisorApprove'])->name('projects.supervisor-approve');
+    Route::post('projects/{project}/request-revision', [ProjectController::class, 'requestRevision'])->name('projects.request-revision');
+    Route::post('projects/{project}/final-approve', [ProjectController::class, 'finalApprove'])->name('projects.final-approve');
+    Route::post('projects/{project}/return', [ProjectController::class, 'returnToStudent'])->name('projects.return');
+    Route::post('projects/{project}/files', [ProjectFileController::class, 'store'])->name('projects.files.store');
+    Route::get('project-files/{file}/download', [ProjectFileController::class, 'download'])->name('projects.files.download');
+    Route::post('projects/{project}/comments', [ProjectCommentController::class, 'store'])->name('projects.comments.store');
+
 
     Route::middleware(['role:admin'])->prefix('admin')->name('admin.')->group(function () {
         Route::get('/dashboard', [AdminDashboard::class, 'index'])->name('dashboard');
@@ -85,7 +111,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('configuration', [ConfigurationController::class, 'index'])->name('configuration.index');
         Route::resource('semester-types', SemesterTypeController::class)->only(['index', 'store', 'update', 'destroy']);
         Route::post('classes/{classGroup}/process-results', [ClassGroupController::class, 'processResults'])->name('classes.process-results');
-        });
+        Route::get('supervision', [SupervisionController::class, 'index'])->name('supervision.index');
+        Route::put('supervision/{student}', [SupervisionController::class, 'update'])->name('supervision.update');
+        Route::get('projects', [AdminProjectController::class, 'index'])->name('projects.index');
+        Route::delete('projects/{project}', [AdminProjectController::class, 'destroy'])->name('projects.destroy');
+    });
 
     Route::middleware(['role:teacher'])->prefix('teacher')->name('teacher.')->group(function () {
         Route::get('/dashboard', [TeacherDashboard::class, 'index'])->name('dashboard');
@@ -94,6 +124,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('subjects/{subject}/grades', [TeacherGradeController::class, 'edit'])->name('grades.edit');
         Route::put('subjects/{subject}/grades', [TeacherGradeController::class, 'update'])->name('grades.update');
         Route::get('schedule', [TeacherScheduleController::class, 'index'])->name('schedule');
+        Route::get('projects', [TeacherProjectController::class, 'index'])->name('projects.index');
     });
 
     Route::middleware(['role:student'])->prefix('student')->name('student.')->group(function () {
@@ -101,9 +132,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('subjects', [StudentSubjectController::class, 'index'])->name('subjects');
         Route::get('grades', [StudentGradeController::class, 'index'])->name('grades');
         Route::get('schedule', [StudentScheduleController::class, 'index'])->name('schedule');
-    
+        Route::get('project', [ProjectController::class, 'mine'])->name('project');
+        Route::post('project', [ProjectController::class, 'store'])->name('project.store');
         });
-});
+});     
 
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

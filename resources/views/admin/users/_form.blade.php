@@ -1,4 +1,6 @@
 @php($user = $user ?? null)
+@php($hasAccount = $user?->hasAccount() ?? false)
+@php($accountOpen = $hasAccount || old('create_account') == '1')
 
 <div>
     <x-input-label for="name" value="Full Name" />
@@ -73,33 +75,99 @@
     @endif
 </div>
 
-<div>
-    <x-input-label for="password"
-                   :value="$user ? 'New Password (leave empty to keep the current one)' : 'Password'" />
-    <x-text-input id="password" name="password" type="password" class="mt-1 block w-full"
-                  :required="! $user" autocomplete="new-password" />
-    <x-input-error :messages="$errors->get('password')" class="mt-2" />
-</div>
+{{-- Login account (optional, except for admins) --}}
+<div class="rounded-lg border border-gray-200 p-4">
+    <div class="flex items-center justify-between gap-4">
+        <div>
+            <div class="font-medium text-gray-800">Login account</div>
+            <div id="account-hint" class="text-sm text-gray-500">
+                @if ($hasAccount)
+                    This user can log in with the email below.
+                @endif
+            </div>
+        </div>
 
-<div>
-    <x-input-label for="password_confirmation" value="Confirm Password" />
-    <x-text-input id="password_confirmation" name="password_confirmation" type="password"
-                  class="mt-1 block w-full" :required="! $user" autocomplete="new-password" />
+        @if ($hasAccount)
+            <span class="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-800">Account active</span>
+        @else
+            <button type="button" id="account-toggle"
+                    class="rounded-md border border-indigo-600 px-3 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-50">
+                Add user account
+            </button>
+        @endif
+    </div>
+
+    <input type="hidden" name="create_account" id="create_account" value="{{ $accountOpen ? 1 : 0 }}">
+
+    <div id="account-fields" class="mt-4 space-y-4">
+        <div>
+            <x-input-label for="account-email" value="Login email" />
+            <input id="account-email" type="email" readonly tabindex="-1"
+                   class="mt-1 block w-full cursor-not-allowed rounded-md border-gray-300 bg-gray-100 text-gray-500 shadow-sm">
+            <p class="mt-1 text-xs text-gray-500">This is the email above. To change it, edit the Email field.</p>
+        </div>
+
+        <div>
+            <x-input-label for="password"
+                           :value="$hasAccount ? 'New Password (leave empty to keep the current one)' : 'Password'" />
+            <x-text-input id="password" name="password" type="password" class="mt-1 block w-full"
+                          :required="! $hasAccount" autocomplete="new-password" />
+            <x-input-error :messages="$errors->get('password')" class="mt-2" />
+        </div>
+
+        <div>
+            <x-input-label for="password_confirmation" value="Confirm Password" />
+            <x-text-input id="password_confirmation" name="password_confirmation" type="password"
+                          class="mt-1 block w-full" :required="! $hasAccount" autocomplete="new-password" />
+        </div>
+    </div>
 </div>
 
 <script>
     const roleSelect = document.getElementById('role');
     const departmentSelect = document.getElementById('department_id');
     const classSelect = document.getElementById('class_group_id'); // missing when the user already has a class
+    const emailInput = document.getElementById('email');
     const departmentField = document.getElementById('department-field');
     const rollNumberField = document.getElementById('roll-number-field');
     const classField = document.getElementById('class-field');
+
+    const hasAccount = {{ $hasAccount ? 'true' : 'false' }};
+    const accountFlag = document.getElementById('create_account');
+    const accountFields = document.getElementById('account-fields');
+    const accountToggle = document.getElementById('account-toggle'); // missing when the user already has an account
+    const accountHint = document.getElementById('account-hint');
+    const lockedEmail = document.getElementById('account-email');
+    let accountOpen = {{ $accountOpen ? 'true' : 'false' }};
+
+    // Opens or closes the password fields. Closed fields are disabled, so they are not sent.
+    function setAccountOpen(open) {
+        accountOpen = open;
+        accountFlag.value = open ? '1' : '0';
+        accountFields.style.display = open ? '' : 'none';
+        accountFields.querySelectorAll('input[name]').forEach(input => input.disabled = !open);
+
+        if (accountToggle) {
+            accountToggle.textContent = open ? 'Cancel account' : 'Add user account';
+        }
+        if (accountHint && !hasAccount) {
+            accountHint.textContent = open
+                ? 'A login account will be created for this user.'
+                : 'This user has no login account yet and cannot log in. You can add it now or later.';
+        }
+    }
 
     function toggleFields() {
         const role = roleSelect.value;
         departmentField.style.display = role === 'admin' ? 'none' : '';
         rollNumberField.style.display = role === 'student' ? '' : 'none';
         classField.style.display = role === 'student' ? '' : 'none';
+
+        // An admin always needs a login account
+        if (accountToggle) {
+            accountToggle.style.display = role === 'admin' ? 'none' : '';
+            if (role === 'admin') setAccountOpen(true);
+        }
     }
 
     // Show only the classes that belong to the selected department
@@ -120,8 +188,20 @@
         if (selectedIsHidden) classSelect.value = '';
     }
 
+    // The login email is locked here and always follows the Email field above
+    function syncEmail() {
+        lockedEmail.value = emailInput.value;
+    }
+
+    if (accountToggle) {
+        accountToggle.addEventListener('click', () => setAccountOpen(!accountOpen));
+    }
     roleSelect.addEventListener('change', toggleFields);
     departmentSelect.addEventListener('change', filterClasses);
+    emailInput.addEventListener('input', syncEmail);
+
+    setAccountOpen(accountOpen);
     toggleFields();
     filterClasses();
+    syncEmail();
 </script>

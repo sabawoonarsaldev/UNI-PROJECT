@@ -2,61 +2,85 @@
     $user = auth()->user();
     $unread = $user->unreadMessagesCount();
 
-    $menus = [
-            'admin' => [
-                ['title' => null, 'items' => [
-                    ['Dashboard', 'admin.dashboard', 'admin.dashboard', 'home'],
-                ]],
-                ['title' => 'Academic', 'items' => [
-                    ['Enrollments', 'admin.enrollments.index', 'admin.enrollments.*', 'user-plus'],
-                    ['Schedules', 'admin.schedules.index', 'admin.schedules.*', 'calendar'],
-                    ['Grades', 'admin.grades.index', 'admin.grades.*', 'pencil-square'],
-                    ['Reports', 'admin.reports.index', 'admin.reports.*', 'chart-bar'],
-                ]],
-                ['title' => 'People', 'items' => [
-                    ['Users', 'admin.users.index', 'admin.users.*', 'users'],
-                ]],
-                ['title' => 'Communication', 'items' => [
-                    ['Announcements', 'admin.announcements.index', 'admin.announcements.*', 'bell'],
-                    ['Messages', 'messages.index', 'messages.*', 'envelope'],
-                ]],
-                ['title' => 'Configuration', 'items' => [
-                    ['Overview', 'admin.configuration.index', 'admin.configuration.*', 'adjustments'],
-                    ['Faculties', 'admin.faculties.index', 'admin.faculties.*', 'building-library'],
-                    ['Departments', 'admin.departments.index', 'admin.departments.*', 'squares'],
-                    ['Classes', 'admin.classes.index', 'admin.classes.*', 'academic-cap'],
-                    ['Subjects', 'admin.subjects.index', 'admin.subjects.*', 'book-open'],
-                    ['Academic Terms', 'admin.semester-types.index', 'admin.semester-types.*', 'calendar'],
-                ]],
-            ],
-        'teacher' => [
-            ['title' => null, 'items' => [
-                ['Dashboard', 'teacher.dashboard', 'teacher.dashboard', 'home'],
-            ]],
-            ['title' => 'Teaching', 'items' => [
-                ['My Subjects', 'teacher.subjects.index', ['teacher.subjects.*', 'teacher.grades.*'], 'book-open'],
-                ['My Schedule', 'teacher.schedule', 'teacher.schedule', 'calendar'],
-            ]],
-            ['title' => 'Communication', 'items' => [
-                ['Announcements', 'announcements.index', 'announcements.*', 'bell'],
-                ['Messages', 'messages.index', 'messages.*', 'envelope'],
-            ]],
-        ],
-        'student' => [
-            ['title' => null, 'items' => [
-                ['Dashboard', 'student.dashboard', 'student.dashboard', 'home'],
-            ]],
-            ['title' => 'Academics', 'items' => [
-                ['My Subjects', 'student.subjects', 'student.subjects', 'book-open'],
-                ['Grades & Transcript', 'student.grades', 'student.grades', 'document-text'],
-                ['My Schedule', 'student.schedule', 'student.schedule', 'calendar'],
-            ]],
-            ['title' => 'Communication', 'items' => [
-                ['Announcements', 'announcements.index', 'announcements.*', 'bell'],
-                ['Messages', 'messages.index', 'messages.*', 'envelope'],
-            ]],
-        ],
-    ];
+
+    // How many projects wait for an action of this user
+    $projectBadge = match ($user->role) {
+        'teacher' => \App\Models\Project::where('supervisor_id', $user->id)->where('status', 'submitted')->count(),
+        'admin' => \App\Models\Project::where('status', 'supervisor_approved')->count(),
+        'student' => \App\Models\Project::where('student_id', $user->id)->where('status', 'revision')->count(),
+        default => 0,
+    };
+    $projectRoutes = ['teacher.projects.index', 'admin.projects.index', 'student.project'];
+
+
+$menus = [
+    'admin' => [
+        ['title' => null, 'items' => [
+            ['Dashboard', 'admin.dashboard', 'admin.dashboard', 'home'],
+        ]],
+        ['title' => 'Academic', 'items' => [
+            ['Enrollments', 'admin.enrollments.index', 'admin.enrollments.*', 'user-plus'],
+            ['Schedules', 'admin.schedules.index', 'admin.schedules.*', 'calendar'],
+            ['Grades', 'admin.grades.index', 'admin.grades.*', 'pencil-square'],
+            ['Reports', 'admin.reports.index', 'admin.reports.*', 'chart-bar'],
+        ]],
+        ['title' => 'People', 'items' => [
+            ['Users', 'admin.users.index', 'admin.users.*', 'users'],
+        ]],
+        ['title' => 'Project Management', 'items' => [
+            ['Supervision', 'admin.supervision.index', 'admin.supervision.*', 'user-plus'],
+            ['All Projects', 'admin.projects.index', ['admin.projects.*', 'projects.*'], 'document-text'],
+            ['Repository', 'repository.index', 'repository.*', 'magnifying-glass'],
+        ]],
+        ['title' => 'Communication', 'items' => [
+            ['Announcements', 'admin.announcements.index', 'admin.announcements.*', 'bell'],
+            ['Messages', 'messages.index', 'messages.*', 'envelope'],
+        ]],
+        ['title' => 'Configuration', 'items' => [
+            ['Overview', 'admin.configuration.index', 'admin.configuration.*', 'adjustments'],
+            ['Faculties', 'admin.faculties.index', 'admin.faculties.*', 'building-library'],
+            ['Departments', 'admin.departments.index', 'admin.departments.*', 'squares'],
+            ['Classes', 'admin.classes.index', 'admin.classes.*', 'academic-cap'],
+            ['Subjects', 'admin.subjects.index', 'admin.subjects.*', 'book-open'],
+            ['Academic Terms', 'admin.semester-types.index', 'admin.semester-types.*', 'calendar'],
+        ]],
+    ],
+    'teacher' => [
+        ['title' => null, 'items' => [
+            ['Dashboard', 'teacher.dashboard', 'teacher.dashboard', 'home'],
+        ]],
+        ['title' => 'Teaching', 'items' => [
+            ['My Subjects', 'teacher.subjects.index', ['teacher.subjects.*', 'teacher.grades.*'], 'book-open'],
+            ['My Schedule', 'teacher.schedule', 'teacher.schedule', 'calendar'],
+        ]],
+        ['title' => 'Project Management', 'items' => [
+            ['My Students\' Projects', 'teacher.projects.index', ['teacher.projects.*', 'projects.*'], 'document-text'],
+            ['Repository', 'repository.index', 'repository.*', 'magnifying-glass'],
+        ]],
+        ['title' => 'Communication', 'items' => [
+            ['Announcements', 'announcements.index', 'announcements.*', 'bell'],
+            ['Messages', 'messages.index', 'messages.*', 'envelope'],
+        ]],
+    ],
+    'student' => [
+        ['title' => null, 'items' => [
+            ['Dashboard', 'student.dashboard', 'student.dashboard', 'home'],
+        ]],
+        ['title' => 'Academics', 'items' => [
+            ['My Subjects', 'student.subjects', 'student.subjects', 'book-open'],
+            ['Grades & Transcript', 'student.grades', 'student.grades', 'document-text'],
+            ['My Schedule', 'student.schedule', 'student.schedule', 'calendar'],
+        ]],
+        ['title' => 'Final Project', 'items' => [
+            ['My Project', 'student.project', ['student.project*', 'projects.*'], 'document-text'],
+            ['Repository', 'repository.index', 'repository.*', 'magnifying-glass'],
+        ]],
+        ['title' => 'Communication', 'items' => [
+            ['Announcements', 'announcements.index', 'announcements.*', 'bell'],
+            ['Messages', 'messages.index', 'messages.*', 'envelope'],
+        ]],
+    ],
+];
 
     $menu = $menus[$user->role] ?? [];
 @endphp
@@ -99,6 +123,9 @@
 
                                 @if ($routeName === 'messages.index' && $unread > 0)
                                     <span class="rounded-full bg-red-500 px-2 py-0.5 text-xs font-semibold text-white">{{ $unread }}</span>
+                                @endif
+                                @if (in_array($routeName, $projectRoutes) && $projectBadge > 0)
+                                    <span class="rounded-full bg-amber-500 px-2 py-0.5 text-xs font-semibold text-white">{{ $projectBadge }}</span>
                                 @endif
                             </a>
                         </li>

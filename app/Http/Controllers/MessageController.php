@@ -40,7 +40,7 @@ class MessageController extends Controller
         $me = auth()->user();
 
         $recipients = $me->role === 'admin'
-            ? User::whereIn('role', ['teacher', 'student'])->orderBy('role')->orderBy('name')->get()
+            ? User::withAccount()->whereIn('role', ['teacher', 'student'])->orderBy('role')->orderBy('name')->get()
             : User::where('role', 'admin')->orderBy('name')->get();
 
         return view('messages.create', compact('recipients'));
@@ -99,16 +99,18 @@ class MessageController extends Controller
     }
 
     // Admins can write to teachers and students; teachers and students can only write to admins
+
     private function canMessage(User $me, User $other): bool
-    {
-        if ($me->id === $other->id) {
-            return false;
-        }
-
-        if ($me->role === 'admin') {
-            return in_array($other->role, ['teacher', 'student']);
-        }
-
-        return $other->role === 'admin';
+{
+    if ($me->id === $other->id) {
+        return false;
     }
+
+    if ($me->role === 'admin') {
+        return in_array($other->role, ['teacher', 'student']) && $other->hasAccount();
+    }
+
+    return $other->role === 'admin';
+}
+
 }

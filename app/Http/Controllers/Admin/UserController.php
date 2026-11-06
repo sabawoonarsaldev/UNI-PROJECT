@@ -16,7 +16,8 @@ class UserController extends Controller
     public function index(Request $request)
     {
         $users = User::with('department')
-            ->when($request->role, fn ($query, $role) => $query->where('role', $role))
+            ->when($request->query('role'), fn ($query, $role) => $query->where('role', $role))
+            ->search($request->query('q'))
             ->latest()
             ->paginate(10)
             ->withQueryString();
@@ -29,51 +30,131 @@ class UserController extends Controller
         return view('admin.users.create', $this->formData());
     }
 
+    
     public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|max:255|unique:users,email',
-            'password' => ['required', 'confirmed', Password::defaults()],
-            'role' => ['required', Rule::in(['admin', 'teacher', 'student'])],
-            'department_id' => ['nullable', 'required_if:role,teacher,student', 'exists:departments,id'],
-            'roll_number' => ['nullable', 'required_if:role,student', 'unique:users,roll_number'],
-            'class_group_id' => ['nullable', Rule::exists('class_groups', 'id')->where('status', 'active')],
-        ]);
+{
+    // An admin always needs a login account; for the others it is optional
+    $wantsAccount = $request->boolean('create_account') || $request->input('role') === 'admin';
 
-        // Only students have a roll number and a class, and admins belong to no department
-        if ($validated['role'] !== 'student') {
-            $validated['roll_number'] = null;
-            $validated['class_group_id'] = null;
+    $validated = $request->validate([
+        'name' => 'required|string|max:255',
+        'email' => 'required|email|max:255|unique:users,email',
+        // The password is checked only when a login account is requested
+        'password' => $wantsAccount ? ['required', 'confirmed', Password::defaults()] : ['nullable'],
+        'role' => ['required', Rule::in(['admin', 'teacher', 'student'])],
+        'department_id' => ['nullable', 'required_if:role,teacher,student', 'exists:departments,id'],
+        'roll_number' => ['nullable', 'required_if:role,student', 'unique:users,roll_number'],
+        'class_group_id' => ['nullable', Rule::exists('class_groups', 'id')->where('status', 'active')],
+    ]);
+
+    // Only students have a roll number and a class, and admins belong to no department
+    if ($validated['role'] !== 'student') {
+        $validated['roll_number'] = null;
+        $validated['class_group_id'] = null;
+    }
+    if ($validated['role'] === 'admin') {
+        $validated['department_id'] = null;
+    }
+
+    $classGroup = null;
+    if (! empty($validated['class_group_id'])) {
+        $classGroup = ClassGroup::findOrFail($validated['class_group_id']);
+
+        if ((int) $validated['department_id'] !== $classGroup->department_id) {
+            throw ValidationException::withMessages([
+                'class_group_id' => 'The selected class belongs to another department.',
+            ]);
         }
-        if ($validated['role'] === 'admin') {
-            $validated['department_id'] = null;
-        }
+    }
 
-        $classGroup = null;
-        if (! empty($validated['class_group_id'])) {
-            $classGroup = ClassGroup::findOrFail($validated['class_group_id']);
+    // The class is assigned below, so the student is also enrolled in its subjects
+    unset($validated['class_group_id']);
 
-            if ((int) $validated['department_id'] !== $classGroup->department_id) {
-                throw ValidationException::withMessages([
-                    'class_group_id' => 'The selected class belongs to another department.',
-                ]);
-            }
-        }
+    // Without an account the password stays empty and the person cannot log in
+    if (! $wantsAccount) {
+        unset($validated['password']);
+    }
 
-        // The class is assigned below, so the student is also enrolled in its subjects
-        unset($validated['class_group_id']);
+    $user = new User($validated);
 
-        $user = new User($validated);
+    if ($wantsAccount) {
         // Accounts created by the admin are trusted, so the email is marked as verified
         $user->email_verified_at = now();
-        $user->save();
-
-        $classGroup?->addStudent($user);
-
-        return redirect()->route('admin.users.index')
-            ->with('success', 'User created successfully.');
     }
+
+    $user->save();
+
+    $classGroup?->addStudent($user);
+
+    return redirect()->route('admin.users.index')->with(
+        'success',
+        $wantsAccount
+            ? 'User and login account created successfully.'
+            : 'User created without a login account. You can add the account later by editing the user.'
+    );
+}
+
+public function update(Request $request, User $user)
+{
+    $hadAccount = $user->hasAccount();
+    $wantsAccount = $hadAccount || $request->boolean('create_account') || $request->input('role') === 'admin';
+
+    $validated = $request->validate([
+        'name' => 'required|string|max:255',
+        'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+        // A new account needs a password. For an existing account the field may stay empty.
+        'password' => $wantsAccount
+            ? [$hadAccount ? 'nullable' : 'required', 'confirmed', Password::defaults()]
+            : ['nullable'],
+        'role' => ['required', Rule::in(['admin', 'teacher', 'student'])],
+        'department_id' => ['nullable', 'required_if:role,teacher,student', 'exists:departments,id'],
+        'roll_number' => ['nullable', 'required_if:role,student', Rule::unique('users', 'roll_number')->ignore($user->id)],
+    ]);
+
+    if ($validated['role'] !== 'student') {
+        $validated['roll_number'] = null;
+    }
+    if ($validated['role'] === 'admin') {
+        $validated['department_id'] = null;
+    }
+
+    // A student of a class keeps the department of that class
+    if ($user->class_group_id) {
+        if ($validated['role'] !== 'student') {
+            throw ValidationException::withMessages([
+                'role' => 'This user belongs to a class. Remove the student from the class first.',
+            ]);
+        }
+
+        $validated['department_id'] = $user->classGroup->department_id;
+    }
+
+    // Keep the old password when the field is left empty (or when there is no account)
+    if (! $wantsAccount || empty($validated['password'])) {
+        unset($validated['password']);
+    }
+
+    // An admin must not change his own role (to avoid locking himself out)
+    if ($user->id === auth()->id()) {
+        $validated['role'] = $user->role;
+    }
+
+    $user->fill($validated);
+
+    // The first password turns the person into a user who can log in
+    $createdAccount = ! $hadAccount && isset($validated['password']);
+    if ($createdAccount) {
+        $user->email_verified_at = now();
+    }
+
+    $user->save();
+
+    return redirect()->route('admin.users.index')->with(
+        'success',
+        $createdAccount ? 'User updated and the login account was created.' : 'User updated successfully.'
+    );
+}
+
 
     public function edit(User $user)
     {
@@ -82,56 +163,18 @@ class UserController extends Controller
         return view('admin.users.edit', $this->formData() + ['user' => $user]);
     }
 
-    public function update(Request $request, User $user)
-    {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
-            'password' => ['nullable', 'confirmed', Password::defaults()],
-            'role' => ['required', Rule::in(['admin', 'teacher', 'student'])],
-            'department_id' => ['nullable', 'required_if:role,teacher,student', 'exists:departments,id'],
-            'roll_number' => ['nullable', 'required_if:role,student', Rule::unique('users', 'roll_number')->ignore($user->id)],
-        ]);
 
-        if ($validated['role'] !== 'student') {
-            $validated['roll_number'] = null;
-        }
-        if ($validated['role'] === 'admin') {
-            $validated['department_id'] = null;
-        }
-
-        // A student of a class keeps the department of that class
-        if ($user->class_group_id) {
-            if ($validated['role'] !== 'student') {
-                throw ValidationException::withMessages([
-                    'role' => 'This user belongs to a class. Remove the student from the class first.',
-                ]);
-            }
-
-            $validated['department_id'] = $user->classGroup->department_id;
-        }
-
-        // Keep the old password when the field is left empty
-        if (empty($validated['password'])) {
-            unset($validated['password']);
-        }
-
-        // An admin must not change his own role (to avoid locking himself out)
-        if ($user->id === auth()->id()) {
-            $validated['role'] = $user->role;
-        }
-
-        $user->update($validated);
-
-        return redirect()->route('admin.users.index')
-            ->with('success', 'User updated successfully.');
-    }
 
     public function destroy(User $user)
     {
         if ($user->id === auth()->id()) {
             return redirect()->route('admin.users.index')
                 ->with('error', 'You cannot delete your own account.');
+        }
+
+        if ($user->project()->exists()) {
+            return redirect()->route('admin.users.index')
+                ->with('error', 'This student has a project. Delete the project first.');
         }
 
         $user->delete();
