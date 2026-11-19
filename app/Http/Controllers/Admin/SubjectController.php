@@ -10,22 +10,29 @@ use App\Models\Subject;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use App\Http\Controllers\Admin\Concerns\FiltersByClass;
+
 
 class SubjectController extends Controller
 {
-    public function index(Request $request)
-    {
-        $subjects = Subject::with(['department', 'semester', 'teacher'])
-            ->when($request->department_id, fn ($query, $id) => $query->where('department_id', $id))
-            ->orderBy('department_id')
-            ->orderBy('semester_id')
-            ->paginate(10)
-            ->withQueryString();
 
-        $departments = Department::orderBy('name')->get();
+use FiltersByClass;
 
-        return view('admin.subjects.index', compact('subjects', 'departments'));
-    }
+   public function index(Request $request)
+{
+    $query = Subject::with([
+        'semester.classGroup.department',
+        'semester.classGroup.entryTerm',
+        'teacher',
+    ]);
+
+    $subjects = $this->orderByClass($this->applyClassFilters($query, $request))
+        ->paginate(10)
+        ->withQueryString();
+
+    return view('admin.subjects.index', ['subjects' => $subjects] + $this->classFilterOptions($request));
+}
+
 
     public function create(Request $request)
     {

@@ -10,20 +10,29 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
+use App\Models\Faculty;
 
 class UserController extends Controller
 {
-    public function index(Request $request)
-    {
-        $users = User::with('department')
-            ->when($request->query('role'), fn ($query, $role) => $query->where('role', $role))
-            ->search($request->query('q'))
-            ->latest()
-            ->paginate(10)
-            ->withQueryString();
+public function index(Request $request)
+{
+    $users = User::with('department.faculty')
+        ->when($request->query('role'), fn ($query, $role) => $query->where('role', $role))
+        ->when($request->query('faculty_id'), function ($query, $id) {
+            $query->whereHas('department', fn ($department) => $department->where('faculty_id', $id));
+        })
+        ->when($request->query('department_id'), fn ($query, $id) => $query->where('department_id', $id))
+        ->search($request->query('q'))
+        ->latest()
+        ->paginate(10)
+        ->withQueryString();
 
-        return view('admin.users.index', compact('users'));
-    }
+    return view('admin.users.index', [
+        'users' => $users,
+        'faculties' => Faculty::orderBy('name')->get(),
+        'departments' => Department::orderBy('name')->get(['id', 'name', 'faculty_id']),
+    ]);
+}
 
     public function create()
     {
@@ -183,15 +192,17 @@ public function update(Request $request, User $user)
             ->with('success', 'User deleted successfully.');
     }
 
-    private function formData(): array
-    {
-        return [
-            'departments' => Department::orderBy('name')->get(),
-            'classes' => ClassGroup::with(['department', 'entryTerm'])
-                ->where('status', 'active')
-                ->get()
-                ->sortBy('name')
-                ->values(),
-        ];
-    }
+private function formData(): array
+{
+    return [
+        'faculties' => Faculty::orderBy('name')->get(),
+        'departments' => Department::orderBy('name')->get(),
+        'classes' => ClassGroup::with(['department', 'entryTerm'])
+            ->where('status', 'active')
+            ->get()
+            ->sortBy('name')
+            ->values(),
+    ];
+}
+
 }

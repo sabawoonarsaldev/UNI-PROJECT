@@ -40,9 +40,8 @@ use App\Http\Controllers\Admin\ProjectController as AdminProjectController;
 use App\Http\Controllers\Admin\SupervisionController;
 use App\Http\Controllers\Teacher\ProjectController as TeacherProjectController;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+
+Route::redirect('/', '/login');
 
 Route::middleware(['auth', 'verified'])->group(function () {
 

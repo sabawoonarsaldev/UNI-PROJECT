@@ -8,24 +8,28 @@ use App\Models\Enrollment;
 use App\Models\Subject;
 use App\Models\User;
 use Illuminate\Http\Request;
+use App\Http\Controllers\Admin\Concerns\FiltersByClass;
 
 class EnrollmentController extends Controller
 {
-    // List of subjects with the number of enrolled students
-    public function index(Request $request)
-    {
-        $subjects = Subject::with(['department', 'semester', 'teacher'])
-            ->withCount('enrollments')
-            ->when($request->department_id, fn ($query, $id) => $query->where('department_id', $id))
-            ->orderBy('department_id')
-            ->orderBy('semester_id')
-            ->paginate(10)
-            ->withQueryString();
 
-        $departments = Department::orderBy('name')->get();
+use FiltersByClass;
 
-        return view('admin.enrollments.index', compact('subjects', 'departments'));
-    }
+public function index(Request $request)
+{
+    $query = Subject::with([
+        'semester.classGroup.department',
+        'semester.classGroup.entryTerm',
+        'teacher',
+    ])->withCount('enrollments');
+
+    $subjects = $this->orderByClass($this->applyClassFilters($query, $request))
+        ->paginate(10)
+        ->withQueryString();
+
+    return view('admin.enrollments.index', ['subjects' => $subjects] + $this->classFilterOptions($request));
+}
+
 
     // Manage the students of one subject
     public function manage(Subject $subject)

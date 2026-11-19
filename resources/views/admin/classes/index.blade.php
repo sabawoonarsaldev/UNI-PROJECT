@@ -19,17 +19,46 @@
                 <div class="rounded-md bg-red-100 p-4 text-sm text-red-800">{{ session('error') }}</div>
             @endif
 
-            <form method="GET" action="{{ route('admin.classes.index') }}" class="flex items-center gap-2 text-sm">
-                <select name="department_id" onchange="this.form.submit()"
-                        class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                    <option value="">All departments</option>
-                    @foreach ($departments as $department)
-                        <option value="{{ $department->id }}" @selected(request('department_id') == $department->id)>
-                            {{ $department->name }}
-                        </option>
-                    @endforeach
-                </select>
-            </form>
+  <form method="GET" action="{{ route('admin.classes.index') }}" class="flex flex-wrap items-center gap-2 text-sm">
+    <select name="department_id" id="department-filter"
+            class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+        <option value="">All departments</option>
+        @foreach ($departments as $department)
+            <option value="{{ $department->id }}" @selected(request('department_id') == $department->id)>
+                {{ $department->name }}
+            </option>
+        @endforeach
+    </select>
+
+    {{-- The year dropdown appears after a department is chosen --}}
+    @if (request('department_id'))
+        <select name="entry_year" id="year-filter"
+                class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+            <option value="">All years</option>
+            @foreach ($years as $year)
+                <option value="{{ $year }}" @selected(request('entry_year') == $year)>Started in {{ $year }}</option>
+            @endforeach
+        </select>
+    @endif
+
+    @if (request('department_id') || request('entry_year'))
+        <a href="{{ route('admin.classes.index') }}" class="text-gray-600 hover:underline">Reset</a>
+    @endif
+</form>
+
+<script>
+    // A new department clears the year, because the years depend on the department
+    document.getElementById('department-filter').addEventListener('change', function () {
+        const year = this.form.elements['entry_year'];
+        if (year) year.value = '';
+        this.form.submit();
+    });
+
+    const yearFilter = document.getElementById('year-filter');
+    if (yearFilter) {
+        yearFilter.addEventListener('change', () => yearFilter.form.submit());
+    }
+</script>
 
             <div class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
                 <table class="min-w-full divide-y divide-gray-200">

@@ -20,19 +20,30 @@ use App\Models\Enrollment;
 
 class ClassGroupController extends Controller
 {
-    public function index(Request $request)
-    {
-        $classes = ClassGroup::with(['department.faculty', 'entryTerm'])
-            ->withCount('students')
-            ->when($request->department_id, fn ($query, $id) => $query->where('department_id', $id))
-            ->orderBy('department_id')
-            ->orderByDesc('entry_year')
-            ->get();
+public function index(Request $request)
+{
+    $departmentId = $request->query('department_id');
 
-        $departments = Department::orderBy('name')->get();
+    $classes = ClassGroup::with(['department.faculty', 'entryTerm'])
+        ->withCount('students')
+        ->when($departmentId, fn ($query, $id) => $query->where('department_id', $id))
+        // The classes that started in this year, even if they are in a higher semester now
+        ->when($request->query('entry_year'), fn ($query, $year) => $query->where('entry_year', $year))
+        ->orderBy('department_id')
+        ->orderByDesc('entry_year')
+        ->get();
 
-        return view('admin.classes.index', compact('classes', 'departments'));
-    }
+    $departments = Department::orderBy('name')->get();
+
+    // The years in which a class started in the selected department
+    $years = ClassGroup::when($departmentId, fn ($query, $id) => $query->where('department_id', $id))
+        ->distinct()
+        ->orderByDesc('entry_year')
+        ->pluck('entry_year');
+
+    return view('admin.classes.index', compact('classes', 'departments', 'years'));
+}
+
 
     public function create()
     {

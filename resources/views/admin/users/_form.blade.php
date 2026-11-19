@@ -29,19 +29,34 @@
     <x-input-error :messages="$errors->get('role')" class="mt-2" />
 </div>
 
-<div id="department-field">
-    <x-input-label for="department_id" value="Department" />
-    <select id="department_id" name="department_id"
-            class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-        <option value="">-- Select department --</option>
-        @foreach ($departments as $department)
-            <option value="{{ $department->id }}"
-                @selected(old('department_id', $user?->department_id) == $department->id)>
-                {{ $department->name }}
-            </option>
-        @endforeach
-    </select>
-    <x-input-error :messages="$errors->get('department_id')" class="mt-2" />
+
+<div id="department-field" class="space-y-4">
+    <div>
+        <x-input-label for="faculty_id" value="Faculty" />
+        <select id="faculty_id"
+                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+            <option value="">-- Select faculty --</option>
+            @foreach ($faculties as $faculty)
+                <option value="{{ $faculty->id }}">{{ $faculty->name }}</option>
+            @endforeach
+        </select>
+        <p class="mt-1 text-xs text-gray-500">Choose the faculty first, then the department.</p>
+    </div>
+
+    <div>
+        <x-input-label for="department_id" value="Department" />
+        <select id="department_id" name="department_id"
+                class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+            <option value="">-- Select department --</option>
+            @foreach ($departments as $department)
+                <option value="{{ $department->id }}" data-faculty="{{ $department->faculty_id }}"
+                    @selected(old('department_id', $user?->department_id) == $department->id)>
+                    {{ $department->name }}
+                </option>
+            @endforeach
+        </select>
+        <x-input-error :messages="$errors->get('department_id')" class="mt-2" />
+    </div>
 </div>
 
 <div id="roll-number-field">
@@ -126,6 +141,7 @@
 <script>
     const roleSelect = document.getElementById('role');
     const departmentSelect = document.getElementById('department_id');
+    const facultySelect = document.getElementById('faculty_id');
     const classSelect = document.getElementById('class_group_id'); // missing when the user already has a class
     const emailInput = document.getElementById('email');
     const departmentField = document.getElementById('department-field');
@@ -170,6 +186,33 @@
         }
     }
 
+
+    // Only the departments of the selected faculty can be chosen
+function filterDepartments() {
+    const faculty = facultySelect.value;
+
+    Array.from(departmentSelect.options).forEach(option => {
+        if (!option.dataset.faculty) return;
+        const matches = !faculty || option.dataset.faculty === faculty;
+        option.hidden = !matches;
+        option.disabled = !matches;
+    });
+
+    const selected = departmentSelect.options[departmentSelect.selectedIndex];
+    if (selected && selected.dataset.faculty && faculty && selected.dataset.faculty !== faculty) {
+        departmentSelect.value = '';
+    }
+}
+
+// When a department is already chosen (edit form or after an error), its faculty is chosen automatically
+function syncFacultyFromDepartment() {
+    const selected = departmentSelect.options[departmentSelect.selectedIndex];
+
+    if (selected && selected.dataset.faculty) {
+        facultySelect.value = selected.dataset.faculty;
+    }
+}
+
     // Show only the classes that belong to the selected department
     function filterClasses() {
         if (!classSelect) return;
@@ -196,12 +239,19 @@
     if (accountToggle) {
         accountToggle.addEventListener('click', () => setAccountOpen(!accountOpen));
     }
-    roleSelect.addEventListener('change', toggleFields);
-    departmentSelect.addEventListener('change', filterClasses);
-    emailInput.addEventListener('input', syncEmail);
-
-    setAccountOpen(accountOpen);
-    toggleFields();
+  roleSelect.addEventListener('change', toggleFields);
+facultySelect.addEventListener('change', () => {
+    filterDepartments();
     filterClasses();
-    syncEmail();
+});
+departmentSelect.addEventListener('change', filterClasses);
+emailInput.addEventListener('input', syncEmail);
+
+syncFacultyFromDepartment();
+filterDepartments();
+setAccountOpen(accountOpen);
+toggleFields();
+filterClasses();
+syncEmail();
+
 </script>

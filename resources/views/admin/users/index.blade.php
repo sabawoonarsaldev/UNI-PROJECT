@@ -11,6 +11,8 @@
         </div>
     </x-slot>
 
+    @php($select = 'rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500')
+
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
 
@@ -21,37 +23,75 @@
                 <div class="mb-4 p-4 bg-red-100 text-red-800 rounded-md">{{ session('error') }}</div>
             @endif
 
-            {{-- Live search bar: the results below change while you type --}}
-            <form id="user-search-form" method="GET" action="{{ route('admin.users.index') }}" class="mb-4 flex gap-2">
+            {{-- Live search and filters: the results below change while you type or choose --}}
+            <form id="user-search-form" method="GET" action="{{ route('admin.users.index') }}" class="mb-4 space-y-3">
                 @if (request('role'))
                     <input type="hidden" name="role" value="{{ request('role') }}">
                 @endif
 
-                <div class="relative flex-1">
-                    <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
-                        <x-icon name="magnifying-glass" class="h-5 w-5" />
-                    </span>
-                    <input id="user-search-input" type="text" name="q" value="{{ request('q') }}"
-                           autocomplete="off" autofocus
-                           placeholder="Search by name, email, roll number or department..."
-                           class="block w-full rounded-md border-gray-300 pl-10 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                <div class="flex gap-2">
+                    <div class="relative flex-1">
+                        <span class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+                            <x-icon name="magnifying-glass" class="h-5 w-5" />
+                        </span>
+                        <input id="user-search-input" type="text" name="q" value="{{ request('q') }}"
+                               autocomplete="off" autofocus
+                               placeholder="Search by name, email, roll number or department..."
+                               class="block w-full rounded-md border-gray-300 pl-10 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    </div>
+
+                    <button type="button" id="user-search-clear"
+                            class="{{ request('q') ? '' : 'hidden' }} items-center rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                        Clear
+                    </button>
                 </div>
 
-                <button type="button" id="user-search-clear"
-                        class="{{ request('q') ? '' : 'hidden' }} items-center rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                    Clear
-                </button>
+                {{-- Admins belong to no faculty, so the filters are hidden for them --}}
+                @if (request('role') !== 'admin')
+                    <div class="flex flex-wrap items-center gap-2">
+                        <select name="faculty_id" id="faculty-filter" class="{{ $select }}">
+                            <option value="">All faculties</option>
+                            @foreach ($faculties as $faculty)
+                                <option value="{{ $faculty->id }}" @selected(request('faculty_id') == $faculty->id)>{{ $faculty->name }}</option>
+                            @endforeach
+                        </select>
+
+                        <select name="department_id" id="department-filter" class="{{ $select }}">
+                            <option value="">All departments</option>
+                            @foreach ($departments as $department)
+                                <option value="{{ $department->id }}" data-faculty="{{ $department->faculty_id }}"
+                                    @selected(request('department_id') == $department->id)>
+                                    {{ $department->name }}
+                                </option>
+                            @endforeach
+                        </select>
+
+                        <button type="button" id="reset-filters"
+                                class="{{ request('faculty_id') || request('department_id') ? '' : 'hidden' }} text-sm text-gray-600 hover:underline">
+                            Reset filters
+                        </button>
+                    </div>
+                @endif
             </form>
 
             {{-- Everything inside this box is replaced by the live search --}}
             <div id="users-results">
+                @php($keep = array_filter([
+                    'q' => request('q'),
+                    'faculty_id' => request('faculty_id'),
+                    'department_id' => request('department_id'),
+                ]))
 
-                {{-- Role filter (keeps the search text) --}}
+                {{-- Role filter (keeps the search text and the filters) --}}
                 <div class="mb-4 flex flex-wrap items-center gap-2 text-sm">
-                    <a href="{{ route('admin.users.index', array_filter(['q' => request('q')])) }}"
+                    <a href="{{ route('admin.users.index', $keep) }}"
                        class="px-3 py-1 rounded-md {{ request('role') ? 'bg-gray-200 text-gray-700' : 'bg-indigo-600 text-white' }}">All</a>
-                    @foreach (['admin' => 'Admins', 'teacher' => 'Teachers', 'student' => 'Students'] as $value => $label)
-                        <a href="{{ route('admin.users.index', array_filter(['role' => $value, 'q' => request('q')])) }}"
+
+                    <a href="{{ route('admin.users.index', array_filter(['role' => 'admin', 'q' => request('q')])) }}"
+                       class="px-3 py-1 rounded-md {{ request('role') === 'admin' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700' }}">Admins</a>
+
+                    @foreach (['teacher' => 'Teachers', 'student' => 'Students'] as $value => $label)
+                        <a href="{{ route('admin.users.index', $keep + ['role' => $value]) }}"
                            class="px-3 py-1 rounded-md {{ request('role') === $value ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700' }}">{{ $label }}</a>
                     @endforeach
 
@@ -65,6 +105,7 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Faculty</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Roll No.</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account</th>
@@ -77,6 +118,7 @@
                                     <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ $user->name }}</td>
                                     <td class="px-6 py-4 text-sm text-gray-500">{{ $user->email }}</td>
                                     <td class="px-6 py-4 text-sm text-gray-500">{{ ucfirst($user->role) }}</td>
+                                    <td class="px-6 py-4 text-sm text-gray-500">{{ $user->department?->faculty?->name ?? '-' }}</td>
                                     <td class="px-6 py-4 text-sm text-gray-500">{{ $user->department?->name ?? '-' }}</td>
                                     <td class="px-6 py-4 text-sm text-gray-500">{{ $user->roll_number ?? '-' }}</td>
                                     <td class="px-6 py-4 text-sm">
@@ -106,7 +148,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="px-6 py-8 text-center text-gray-500">
+                                    <td colspan="8" class="px-6 py-8 text-center text-gray-500">
                                         @if (request('q'))
                                             No users match "{{ request('q') }}".
                                         @else
@@ -132,22 +174,58 @@
             const input = document.getElementById('user-search-input');
             const clearButton = document.getElementById('user-search-clear');
             const results = document.getElementById('users-results');
+            const facultySelect = document.getElementById('faculty-filter');       // missing in the admin list
+            const departmentSelect = document.getElementById('department-filter');
+            const resetButton = document.getElementById('reset-filters');
 
             let timer = null;
             let controller = null;
 
-            async function search() {
-                const term = input.value.trim();
-                clearButton.classList.toggle('hidden', term === '');
+            // Only the departments of the selected faculty can be chosen
+            function filterDepartments() {
+                if (!facultySelect) return;
 
-                // The same page with the new search text (the role filter in the address stays)
-                const url = new URL(window.location.href);
-                url.searchParams.delete('page');
-                if (term) {
-                    url.searchParams.set('q', term);
-                } else {
-                    url.searchParams.delete('q');
+                const faculty = facultySelect.value;
+
+                Array.from(departmentSelect.options).forEach(option => {
+                    if (!option.dataset.faculty) return;
+                    const matches = !faculty || option.dataset.faculty === faculty;
+                    option.hidden = !matches;
+                    option.disabled = !matches;
+                });
+
+                const selected = departmentSelect.options[departmentSelect.selectedIndex];
+                if (selected && selected.dataset.faculty && faculty && selected.dataset.faculty !== faculty) {
+                    departmentSelect.value = '';
                 }
+            }
+
+            // The address of the current search: every field of the form that is not empty
+            function currentUrl() {
+                const params = new URLSearchParams();
+
+                new FormData(form).forEach((value, key) => {
+                    const text = String(value).trim();
+                    if (text !== '') params.set(key, text);
+                });
+
+                const query = params.toString();
+
+                return form.action + (query ? '?' + query : '');
+            }
+
+            function toggleButtons() {
+                clearButton.classList.toggle('hidden', input.value.trim() === '');
+
+                if (resetButton) {
+                    resetButton.classList.toggle('hidden', !facultySelect.value && !departmentSelect.value);
+                }
+            }
+
+            async function search() {
+                toggleButtons();
+
+                const url = currentUrl();
 
                 // A newer search cancels the older one that is still running
                 if (controller) controller.abort();
@@ -182,7 +260,6 @@
                 timer = setTimeout(search, 300);
             });
 
-            // Enter searches at once and does not reload the page
             form.addEventListener('submit', (event) => {
                 event.preventDefault();
                 clearTimeout(timer);
@@ -195,7 +272,23 @@
                 input.focus();
             });
 
-            // When the page opens with an old search text, the cursor goes to the end of it
+            if (facultySelect) {
+                facultySelect.addEventListener('change', () => {
+                    filterDepartments();
+                    search();
+                });
+                departmentSelect.addEventListener('change', search);
+
+                resetButton.addEventListener('click', () => {
+                    facultySelect.value = '';
+                    departmentSelect.value = '';
+                    filterDepartments();
+                    search();
+                });
+
+                filterDepartments();
+            }
+
             input.setSelectionRange(input.value.length, input.value.length);
         })();
     </script>
