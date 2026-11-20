@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin\Concerns;
 use App\Models\ClassGroup;
 use App\Models\Department;
 use App\Models\Semester;
+use Closure;
 use Illuminate\Http\Request;
 
 // Department -> class -> semester filters for the pages that list subjects
@@ -31,22 +32,46 @@ trait FiltersByClass
     }
 
     // The options of the three dropdowns. Every dropdown depends on the one before it.
-    protected function classFilterOptions(Request $request): array
+    // $scope (optional) returns a fresh query of the allowed subjects, for example the subjects
+    // of one teacher. Then the dropdowns offer only the options where those subjects exist.
+    protected function classFilterOptions(Request $request, ?Closure $scope = null): array
     {
         $departmentId = $request->query('department_id');
         $classId = $request->query('class_group_id');
 
+        $departments = Department::orderBy('name');
+        if ($scope) {
+            $departments->whereIn('id', $scope()->select('department_id'));
+        }
+
+        $classes = collect();
+        if ($departmentId) {
+            $classes = ClassGroup::with(['department', 'entryTerm'])
+                ->where('department_id', $departmentId)
+                ->orderByDesc('entry_year');
+
+            if ($scope) {
+                $classes->whereIn('id', Semester::whereIn('id', $scope()->select('semester_id'))->select('class_group_id'));
+            }
+
+            $classes = $classes->get();
+        }
+
+        $semesters = collect();
+        if ($classId) {
+            $semesters = Semester::where('class_group_id', $classId)->orderBy('number');
+
+            if ($scope) {
+                $semesters->whereIn('id', $scope()->select('semester_id'));
+            }
+
+            $semesters = $semesters->get();
+        }
+
         return [
-            'departments' => Department::orderBy('name')->get(),
-            'classes' => $departmentId
-                ? ClassGroup::with(['department', 'entryTerm'])
-                    ->where('department_id', $departmentId)
-                    ->orderByDesc('entry_year')
-                    ->get()
-                : collect(),
-            'semesters' => $classId
-                ? Semester::where('class_group_id', $classId)->orderBy('number')->get()
-                : collect(),
+            'departments' => $departments->get(),
+            'classes' => $classes,
+            'semesters' => $semesters,
         ];
     }
 }

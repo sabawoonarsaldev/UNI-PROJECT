@@ -36,7 +36,18 @@
                                         -
                                     @endforelse
                                 </td>
-                                <td class="px-6 py-4 text-sm text-gray-900">{{ $grade ? (float) $grade->marks : '-' }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-900">
+                                    @if ($grade)
+                                        <div class="font-semibold">{{ (float) $grade->marks }} / 100</div>
+                                        <div class="text-xs text-gray-500">
+                                            @foreach (\App\Models\Grade::COMPONENTS as $component)
+                                                {{ $component['label'] }}: {{ $grade->{$component['column']} !== null ? (float) $grade->{$component['column']} : '-' }}/{{ $component['max'] }}@if (! $loop->last) &middot; @endif
+                                            @endforeach
+                                        </div>
+                                    @else
+                                        -
+                                    @endif
+                                </td>
                                 <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ $grade?->grade_letter ?? '-' }}</td>
                             </tr>
                         @empty

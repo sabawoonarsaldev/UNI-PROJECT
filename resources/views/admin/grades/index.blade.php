@@ -8,17 +8,7 @@
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
 
-            <form method="GET" action="{{ route('admin.grades.index') }}" class="mb-4 flex items-center gap-2 text-sm">
-                <select name="department_id" onchange="this.form.submit()"
-                        class="border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                    <option value="">All departments</option>
-                    @foreach ($departments as $department)
-                        <option value="{{ $department->id }}" @selected(request('department_id') == $department->id)>
-                            {{ $department->name }}
-                        </option>
-                    @endforeach
-                </select>
-            </form>
+            @include('admin.partials.class-filters', ['action' => route('admin.grades.index')])
 
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <table class="min-w-full divide-y divide-gray-200">
@@ -26,7 +16,8 @@
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subject</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department / Semester</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Class</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Semester</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Teacher</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Graded</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Average</th>
@@ -39,9 +30,8 @@
                             <tr>
                                 <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ $subject->code }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-900">{{ $subject->name }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-500">
-                                    {{ $subject->department->name }} / {{ $subject->semester->name }}
-                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-500">{{ $subject->semester->classGroup?->name ?? '-' }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-500">{{ $subject->semester->name }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-500">{{ $subject->teacher?->name ?? 'Not assigned' }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-500">
                                     {{ $subject->grades_count }} / {{ $subject->enrollments_count }}
@@ -59,7 +49,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="px-6 py-8 text-center text-gray-500">No subjects found.</td>
+                                <td colspan="9" class="px-6 py-8 text-center text-gray-500">No subjects found for this selection.</td>
                             </tr>
                         @endforelse
                     </tbody>

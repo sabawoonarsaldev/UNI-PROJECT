@@ -7,13 +7,16 @@
 
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
+
+            @include('admin.partials.class-filters', ['action' => route('teacher.subjects.index')])
+
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subject</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Class</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Semester</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Students</th>
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -24,7 +27,7 @@
                             <tr>
                                 <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ $subject->code }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-900">{{ $subject->name }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-500">{{ $subject->department->name }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-500">{{ $subject->semester->classGroup?->name ?? '-' }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-500">
                                     {{ $subject->semester->name }}
                                     @unless ($subject->semester->is_active)
@@ -40,7 +43,7 @@
                         @empty
                             <tr>
                                 <td colspan="6" class="px-6 py-8 text-center text-gray-500">
-                                    No subjects are assigned to you yet.
+                                    No subjects found for this selection.
                                 </td>
                             </tr>
                         @endforelse

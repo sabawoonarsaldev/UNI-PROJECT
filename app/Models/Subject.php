@@ -67,26 +67,37 @@ public function gradebook(bool $asAdmin = false): Collection
         ->values();
 }
 
-// Saves the marks of the editable rows. $marks is [enrollment id => marks]; an empty value deletes the grade.
-public function saveGrades(Collection $rows, array $marks): void
+
+// Saves the scores of the editable rows. $scores is [enrollment id => [exam, homework, activity, final]].
+// A row without any score deletes the grade (= not graded yet).
+public function saveGrades(Collection $rows, array $scores): void
 {
     foreach ($rows->where('editable', true) as $enrollment) {
-        $value = $marks[$enrollment->id] ?? null;
+        $row = $scores[$enrollment->id] ?? [];
+        $parts = [];
 
-        if ($value === null || $value === '') {
+        foreach (Grade::COMPONENTS as $key => $component) {
+            $value = $row[$key] ?? null;
+            $parts[$component['column']] = ($value === null || $value === '') ? null : (float) $value;
+        }
+
+        if (collect($parts)->every(fn ($value) => $value === null)) {
             $enrollment->grade?->delete();
             continue;
         }
 
+        // The total is always the sum of the four parts
+        $total = round(array_sum($parts), 2);
+
         Grade::updateOrCreate(
             ['enrollment_id' => $enrollment->id],
-            [
+            $parts + [
                 'student_id' => $enrollment->student_id,
                 'subject_id' => $this->id,
                 'semester_id' => $enrollment->semester_id,
                 'chance' => $enrollment->chance,
-                'marks' => $value,
-                'grade_letter' => Grade::letterFor((float) $value),
+                'marks' => $total,
+                'grade_letter' => Grade::letterFor($total),
             ]
         );
     }

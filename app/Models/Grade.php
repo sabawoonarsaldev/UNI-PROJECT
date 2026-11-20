@@ -3,11 +3,16 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
+
 
 class Grade extends Model
 {
     protected $fillable = [
-    'enrollment_id', 'student_id', 'subject_id', 'semester_id', 'chance', 'marks', 'grade_letter',
+        'enrollment_id', 'student_id', 'subject_id', 'semester_id', 'chance',
+        'exam_score', 'homework_score', 'activity_score', 'final_score',
+        'marks', 'grade_letter',
     ];
 
     protected $casts = ['chance' => 'integer'];
@@ -35,6 +40,41 @@ class Grade extends Model
 
 public const MAX_CHANCES = 4;
 public const PASS_MARK = 55;
+
+// The four parts of the total mark (together 100)
+public const COMPONENTS = [
+    'exam' => ['column' => 'exam_score', 'label' => 'Exams', 'max' => 20],
+    'homework' => ['column' => 'homework_score', 'label' => 'Homework', 'max' => 10],
+    'activity' => ['column' => 'activity_score', 'label' => 'Class activity', 'max' => 10],
+    'final' => ['column' => 'final_score', 'label' => 'Final exam', 'max' => 60],
+];
+
+// Checks the scores of a grade form: every box has its own maximum,
+// and a student gets either all four scores or none
+public static function validateScores(Request $request): array
+{
+    $rules = ['scores' => ['array']];
+
+    foreach (self::COMPONENTS as $key => $component) {
+        $rules["scores.*.{$key}"] = ['nullable', 'numeric', 'min:0', "max:{$component['max']}"];
+    }
+
+    $scores = $request->validate($rules)['scores'] ?? [];
+
+    foreach ($scores as $id => $row) {
+        $filled = collect(array_keys(self::COMPONENTS))
+            ->filter(fn ($key) => isset($row[$key]) && $row[$key] !== '')
+            ->count();
+
+        if ($filled > 0 && $filled < count(self::COMPONENTS)) {
+            throw ValidationException::withMessages([
+                "scores.{$id}" => 'Fill all four boxes of this student, or leave the row empty.',
+            ]);
+        }
+    }
+
+    return $scores;
+}
 
 public static function letterFor(float $marks): string
 {

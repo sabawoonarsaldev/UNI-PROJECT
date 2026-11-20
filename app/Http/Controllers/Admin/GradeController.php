@@ -7,27 +7,30 @@ use App\Models\Department;
 use App\Models\Grade;
 use App\Models\Subject;
 use Illuminate\Http\Request;
+use App\Http\Controllers\Admin\Concerns\FiltersByClass;
 
 class GradeController extends Controller
 {
+    use FiltersByClass;
     // All subjects with grading statistics
     public function index(Request $request)
-    {
-        $subjects = Subject::with(['department', 'semester', 'teacher'])
-            ->withCount('enrollments')
-            ->withCount('grades')
-            ->withCount(['grades as passed_count' => fn ($query) => $query->where('marks', '>=', Grade::PASS_MARK)])
-            ->withAvg('grades', 'marks')
-            ->when($request->department_id, fn ($query, $id) => $query->where('department_id', $id))
-            ->orderBy('department_id')
-            ->orderBy('semester_id')
-            ->paginate(10)
-            ->withQueryString();
+{
+    $query = Subject::with([
+            'semester.classGroup.department',
+            'semester.classGroup.entryTerm',
+            'teacher',
+        ])
+        ->withCount('enrollments')
+        ->withCount('grades')
+        ->withCount(['grades as passed_count' => fn ($q) => $q->where('marks', '>=', Grade::PASS_MARK)])
+        ->withAvg('grades', 'marks');
 
-        $departments = Department::orderBy('name')->get();
+    $subjects = $this->orderByClass($this->applyClassFilters($query, $request))
+        ->paginate(10)
+        ->withQueryString();
 
-        return view('admin.grades.index', compact('subjects', 'departments'));
-    }
+    return view('admin.grades.index', ['subjects' => $subjects] + $this->classFilterOptions($request));
+}
 
 
     public function show(Subject $subject)
@@ -60,12 +63,8 @@ class GradeController extends Controller
 // The admin may change the latest chance of any student, even when the semester is closed
 public function update(Request $request, Subject $subject)
 {
-    $request->validate([
-        'marks' => 'array',
-        'marks.*' => 'nullable|numeric|min:0|max:100',
-    ]);
-
-    $subject->saveGrades($subject->gradebook(true), $request->input('marks', []));
+    $scores = Grade::validateScores($request);
+    $subject->saveGrades($subject->gradebook(true), $scores);
 
     return redirect()->route('admin.grades.show', $subject)
         ->with('success', 'Grades saved successfully.');

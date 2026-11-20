@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Validation\Rule;
 
 class LoginRequest extends FormRequest
 {
@@ -28,6 +29,7 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'role' => ['required', Rule::in(['admin', 'teacher', 'student'])],
             'email' => ['required', 'string', 'email'],
             'password' => ['required', 'string'],
         ];
@@ -42,11 +44,12 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
+        // The selected role is part of the login: a teacher cannot log in as a student
+        if (! Auth::attempt($this->only('email', 'password', 'role'), $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
-                'email' => trans('auth.failed'),
+                'email' => 'These credentials do not match our records for the selected role.',
             ]);
         }
 
