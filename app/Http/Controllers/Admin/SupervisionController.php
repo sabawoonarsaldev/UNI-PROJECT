@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use App\Models\AuditLog;
 
 class SupervisionController extends Controller
 {
@@ -37,42 +38,54 @@ class SupervisionController extends Controller
         return view('admin.supervision.index', compact('students', 'teachers', 'departments'));
     }
 
-    public function update(Request $request, User $student)
-    {
-        abort_unless($student->role === 'student', 404);
+public function update(Request $request, User $student)
+{
+    abort_unless($student->role === 'student', 404);
 
-        $data = $request->validate([
-            'supervisor_id' => [
-                'nullable',
-                Rule::exists('users', 'id')->where(
-                    fn ($query) => $query->where('role', 'teacher')->whereNotNull('password')
-                ),
-            ],
-        ]);
+    $data = $request->validate([
+        'supervisor_id' => [
+            'nullable',
+            Rule::exists('users', 'id')->where(
+                fn ($query) => $query->where('role', 'teacher')->whereNotNull('password')
+            ),
+        ],
+    ]);
 
-        $supervisorId = $data['supervisor_id'] ?? null;
-        $supervisor = $supervisorId ? User::find($supervisorId) : null;
+    $supervisorId = $data['supervisor_id'] ?? null;
+    $supervisor = $supervisorId ? User::find($supervisorId) : null;
 
-        DB::transaction(function () use ($student, $supervisorId, $supervisor) {
-            $student->update(['supervisor_id' => $supervisorId]);
+    // Read before the change, for the audit log
+    $oldSupervisor = $student->supervisor?->name;
 
-            // The project follows the new supervisor, unless it is already published
-            $project = $student->project;
+    DB::transaction(function () use ($student, $supervisorId, $supervisor) {
+        $student->update(['supervisor_id' => $supervisorId]);
 
-            if ($project && $project->status !== 'approved') {
-                $project->update(['supervisor_id' => $supervisorId]);
+        // The project follows the new supervisor, unless it is already published
+        $project = $student->project;
 
-                $project->comments()->create([
-                    'user_id' => auth()->id(),
-                    'type' => 'status',
-                    'status' => $project->status,
-                    'body' => $supervisor ? "Supervisor changed to {$supervisor->name}." : 'Supervisor removed.',
-                ]);
-            }
-        });
+        if ($project && $project->status !== 'approved') {
+            $project->update(['supervisor_id' => $supervisorId]);
 
-        return back()->with('success', $supervisor
-            ? "{$supervisor->name} is now the supervisor of {$student->name}."
-            : "The supervisor of {$student->name} was removed.");
-    }
+            $project->comments()->create([
+                'user_id' => auth()->id(),
+                'type' => 'status',
+                'status' => $project->status,
+                'body' => $supervisor ? "Supervisor changed to {$supervisor->name}." : 'Supervisor removed.',
+            ]);
+        }
+    });
+
+    AuditLog::record(
+        'supervisor.changed',
+        "Supervisor of {$student->name} changed from " . ($oldSupervisor ?? 'nobody') . ' to ' . ($supervisor?->name ?? 'nobody') . '.',
+        $student,
+        ['supervisor' => $oldSupervisor],
+        ['supervisor' => $supervisor?->name]
+    );
+
+    return back()->with('success', $supervisor
+        ? "{$supervisor->name} is now the supervisor of {$student->name}."
+        : "The supervisor of {$student->name} was removed.");
+}
+
 }

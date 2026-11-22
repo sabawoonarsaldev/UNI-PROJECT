@@ -12,7 +12,7 @@ class GradeController extends Controller
         $student = auth()->user();
         $student->load(['department', 'currentSemester']);
 
-        $grades = $student->grades()->with(['subject', 'semester.type'])->get();
+        $grades = $student->publishedGrades()->with(['subject', 'semester.type'])->get();
 
         // One block per semester, each with its own GPA and average
         $semesters = $grades->groupBy('semester_id')

@@ -41,6 +41,13 @@ class Grade extends Model
 public const MAX_CHANCES = 4;
 public const PASS_MARK = 55;
 
+// status => [label, badge style]
+public const STATUSES = [
+    'draft' => ['Draft', 'bg-gray-100 text-gray-700'],
+    'submitted' => ['Waiting for admin', 'bg-amber-100 text-amber-800'],
+    'published' => ['Published', 'bg-green-100 text-green-800'],
+];
+
 // The four parts of the total mark (together 100)
 public const COMPONENTS = [
     'exam' => ['column' => 'exam_score', 'label' => 'Exams', 'max' => 20],

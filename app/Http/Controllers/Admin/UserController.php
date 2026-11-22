@@ -11,6 +11,7 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 use App\Models\Faculty;
+use App\Models\AuditLog;
 
 class UserController extends Controller
 {
@@ -40,7 +41,7 @@ public function index(Request $request)
     }
 
     
-    public function store(Request $request)
+public function store(Request $request)
 {
     // An admin always needs a login account; for the others it is optional
     $wantsAccount = $request->boolean('create_account') || $request->input('role') === 'admin';
@@ -94,6 +95,12 @@ public function index(Request $request)
     $user->save();
 
     $classGroup?->addStudent($user);
+
+    AuditLog::record(
+        'user.created',
+        "User {$user->name} ({$user->role}) was created" . ($wantsAccount ? ' with a login account.' : ' without a login account.'),
+        $user
+    );
 
     return redirect()->route('admin.users.index')->with(
         'success',
@@ -150,6 +157,26 @@ public function update(Request $request, User $user)
 
     $user->fill($validated);
 
+    // What changed, for the audit log (the password is never written to the log)
+    $old = [];
+    $new = [];
+
+    foreach ($user->getDirty() as $field => $value) {
+        if (in_array($field, ['password', 'email_verified_at'], true)) {
+            continue;
+        }
+
+        if ($field === 'department_id') {
+            $old['department'] = Department::find($user->getOriginal('department_id'))?->name;
+            $new['department'] = Department::find($value)?->name;
+
+            continue;
+        }
+
+        $old[$field] = $user->getOriginal($field);
+        $new[$field] = $value;
+    }
+
     // The first password turns the person into a user who can log in
     $createdAccount = ! $hadAccount && isset($validated['password']);
     if ($createdAccount) {
@@ -157,6 +184,18 @@ public function update(Request $request, User $user)
     }
 
     $user->save();
+
+    if ($new) {
+        if (array_key_exists('role', $new)) {
+            AuditLog::record('user.role_changed', "Role of {$user->name} changed from {$old['role']} to {$new['role']}.", $user, $old, $new);
+        } else {
+            AuditLog::record('user.updated', "User {$user->name} was updated (" . implode(', ', array_keys($new)) . ').', $user, $old, $new);
+        }
+    }
+
+    if ($createdAccount) {
+        AuditLog::record('user.account_created', "A login account was created for {$user->name}.", $user);
+    }
 
     return redirect()->route('admin.users.index')->with(
         'success',
@@ -173,24 +212,31 @@ public function update(Request $request, User $user)
     }
 
 
-
-    public function destroy(User $user)
-    {
-        if ($user->id === auth()->id()) {
-            return redirect()->route('admin.users.index')
-                ->with('error', 'You cannot delete your own account.');
-        }
-
-        if ($user->project()->exists()) {
-            return redirect()->route('admin.users.index')
-                ->with('error', 'This student has a project. Delete the project first.');
-        }
-
-        $user->delete();
-
+public function destroy(User $user)
+{
+    if ($user->id === auth()->id()) {
         return redirect()->route('admin.users.index')
-            ->with('success', 'User deleted successfully.');
+            ->with('error', 'You cannot delete your own account.');
     }
+
+    if ($user->project()->exists()) {
+        return redirect()->route('admin.users.index')
+            ->with('error', 'This student has a project. Delete the project first.');
+    }
+
+    // The log is written before the delete, because afterwards nothing is left to describe
+    AuditLog::record(
+        'user.deleted',
+        "User {$user->name} ({$user->role}, {$user->email}) was deleted.",
+        $user,
+        ['name' => $user->name, 'email' => $user->email, 'role' => $user->role]
+    );
+
+    $user->delete();
+
+    return redirect()->route('admin.users.index')
+        ->with('success', 'User deleted successfully.');
+}
 
 private function formData(): array
 {

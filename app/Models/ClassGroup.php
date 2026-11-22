@@ -148,10 +148,12 @@ public function evaluate(): array
         foreach ($subjects as $enrollments) {
             $latest = $enrollments->sortByDesc('chance')->first();
 
-            if (! $latest->grade) {
-                $hasOpenSubject = true; // a retake that is waiting for its mark
-                continue;
-            }
+            // A retake without a mark, or with a mark that is not published yet, is still open
+if (! $latest->grade || $latest->grade->status !== 'published') {
+    $hasOpenSubject = true;
+    continue;
+}
+
 
             if ($latest->grade->marks >= Grade::PASS_MARK) {
                 continue;

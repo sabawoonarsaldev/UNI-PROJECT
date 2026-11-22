@@ -115,4 +115,10 @@ public function scopeSearch($query, ?string $term)
     return $query;
 }
 
+// Only the grades that the administration published: students must see only these
+public function publishedGrades()
+{
+    return $this->hasMany(Grade::class, 'student_id')->where('status', 'published');
+}
+
 }

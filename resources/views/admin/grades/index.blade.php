@@ -22,6 +22,7 @@
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Graded</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Average</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pass rate</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Results</th>
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                         </tr>
                     </thead>
@@ -42,6 +43,11 @@
                                 <td class="px-6 py-4 text-sm text-gray-900">
                                     {{ $subject->grades_count > 0 ? round($subject->passed_count / $subject->grades_count * 100) . '%' : '-' }}
                                 </td>
+                                <td class="px-6 py-4 text-xs">
+                                    <span class="text-gray-600">{{ $subject->draft_count }} draft</span> &middot;
+                                    <span class="{{ $subject->submitted_count > 0 ? 'font-semibold text-amber-700' : 'text-gray-600' }}">{{ $subject->submitted_count }} waiting</span> &middot;
+                                    <span class="text-green-700">{{ $subject->published_count }} published</span>
+                                </td>
                                 <td class="px-6 py-4 text-sm text-right">
                                     <a href="{{ route('admin.grades.show', $subject) }}"
                                        class="text-indigo-600 hover:underline">View / Edit</a>
@@ -49,7 +55,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="9" class="px-6 py-8 text-center text-gray-500">No subjects found for this selection.</td>
+                                <td colspan="10" class="px-6 py-8 text-center text-gray-500">No subjects found for this selection.</td>
                             </tr>
                         @endforelse
                     </tbody>

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\ClassGroup;
 use App\Models\Department;
 use App\Models\Grade;
@@ -190,9 +191,16 @@ public function index(Request $request)
         ->whereDoesntHave('grade')
         ->count();
 
-    if ($missing > 0) {
-        return $back->with('error', "{$missing} grade(s) are still missing. All grades must be entered before the semester can be completed.");
-    }
+if ($missing > 0) {
+    return $back->with('error', "{$missing} grade(s) are still missing. All grades must be entered before the semester can be completed.");
+}
+
+// The results must be official before the semester is closed
+$unpublished = Grade::whereIn('subject_id', $subjectIds)->where('status', '!=', 'published')->count();
+
+if ($unpublished > 0) {
+    return $back->with('error', "{$unpublished} grade(s) are not published yet. Publish them first (Publish all grades, or Academic > Grades).");
+}
 
     [$next, $summary] = DB::transaction(function () use ($classGroup) {
         $next = $classGroup->advance();
@@ -206,6 +214,30 @@ public function index(Request $request)
 
     return $back->with('success', $message . $this->summaryMessage($summary));
 }
+
+// Publishes the grades of all subjects of the current semester at once
+public function publishGrades(ClassGroup $classGroup)
+{
+    $semester = $classGroup->currentSemester();
+
+    $count = Grade::whereIn('subject_id', $semester->subjects()->pluck('id'))
+        ->where('status', '!=', 'published')
+        ->update(['status' => 'published', 'published_at' => now(), 'published_by' => auth()->id()]);
+
+    if ($count > 0) {
+        AuditLog::record(
+            'grade.published',
+            "{$count} grade(s) of {$semester->name} ({$classGroup->name}) were published to the students.",
+            $classGroup
+        );
+    }
+
+    return redirect()->route('admin.classes.show', $classGroup)->with(
+        $count > 0 ? 'success' : 'error',
+        $count > 0 ? "{$count} grade(s) were published." : 'There are no unpublished grades in this semester.'
+    );
+}
+
 
 // Used after the marks of retakes were entered
 public function processResults(ClassGroup $classGroup)

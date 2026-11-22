@@ -54,9 +54,13 @@ public function gradebook(bool $asAdmin = false): Collection
 
         // The admin may change the latest chance of any student.
         // A teacher may change chance 1 while the semester is open, and the latest retake of an active student.
+        // The teacher can change a grade only while it is a draft: after "submit" it belongs to the administration
+        $isDraft = ! $enrollment->grade || $enrollment->grade->status === 'draft';
+
         $editable = $asAdmin
             ? $isLatest
-            : $enrollment->student->academic_status === 'active'
+            : $isDraft
+                && $enrollment->student->academic_status === 'active'
                 && ($enrollment->chance === 1 ? $semesterIsOpen : $isLatest);
 
         $enrollment->setAttribute('editable', $editable);
@@ -69,7 +73,7 @@ public function gradebook(bool $asAdmin = false): Collection
 
 
 // Saves the scores of the editable rows. $scores is [enrollment id => [exam, homework, activity, final]].
-// A row without any score deletes the grade (= not graded yet).
+// A row without any score deletes the grade (= not graded yet). Every change goes into the audit log.
 public function saveGrades(Collection $rows, array $scores): void
 {
     foreach ($rows->where('editable', true) as $enrollment) {
@@ -81,15 +85,24 @@ public function saveGrades(Collection $rows, array $scores): void
             $parts[$component['column']] = ($value === null || $value === '') ? null : (float) $value;
         }
 
+        $existing = $enrollment->grade;
+        $label = "{$enrollment->student->name} in {$this->code}"
+            . ($enrollment->chance > 1 ? " (chance {$enrollment->chance})" : '');
+
         if (collect($parts)->every(fn ($value) => $value === null)) {
-            $enrollment->grade?->delete();
+            if ($existing) {
+                AuditLog::record('grade.deleted', "Grade removed: {$label}.", $existing, self::gradeSnapshot($existing));
+                $existing->delete();
+            }
+
             continue;
         }
 
         // The total is always the sum of the four parts
         $total = round(array_sum($parts), 2);
+        $old = $existing ? self::gradeSnapshot($existing) : [];
 
-        Grade::updateOrCreate(
+        $grade = Grade::updateOrCreate(
             ['enrollment_id' => $enrollment->id],
             $parts + [
                 'student_id' => $enrollment->student_id,
@@ -100,7 +113,33 @@ public function saveGrades(Collection $rows, array $scores): void
                 'grade_letter' => Grade::letterFor($total),
             ]
         );
+
+        $new = self::gradeSnapshot($grade);
+
+        if (! $existing) {
+            AuditLog::record('grade.created', "Grade entered: {$label} = {$new['total']}.", $grade, [], $new);
+        } elseif ($old != $new) {
+            AuditLog::record('grade.updated', "Grade changed: {$label} from {$old['total']} to {$new['total']}.", $grade, $old, $new);
+        }
     }
 }
+
+// The four parts and the total of a grade, in a form that is easy to read in the log
+private static function gradeSnapshot(Grade $grade): array
+{
+    return [
+        'exams' => $grade->exam_score !== null ? (float) $grade->exam_score : null,
+        'homework' => $grade->homework_score !== null ? (float) $grade->homework_score : null,
+        'activity' => $grade->activity_score !== null ? (float) $grade->activity_score : null,
+        'final' => $grade->final_score !== null ? (float) $grade->final_score : null,
+        'total' => (float) $grade->marks,
+    ];
+}
+
+public function attendanceSessions()
+{
+    return $this->hasMany(AttendanceSession::class);
+}
+
 
 }

@@ -21,6 +21,7 @@ $menus = [
         ['title' => 'Academic', 'items' => [
             ['Enrollments', 'admin.enrollments.index', 'admin.enrollments.*', 'user-plus'],
             ['Schedules', 'admin.schedules.index', 'admin.schedules.*', 'calendar'],
+            ['Attendance', 'admin.attendance.index', 'admin.attendance.*', 'check-circle'],
             ['Grades', 'admin.grades.index', 'admin.grades.*', 'pencil-square'],
             ['Reports', 'admin.reports.index', 'admin.reports.*', 'chart-bar'],
         ]],
@@ -43,6 +44,10 @@ $menus = [
             ['Classes', 'admin.classes.index', 'admin.classes.*', 'academic-cap'],
             ['Subjects', 'admin.subjects.index', 'admin.subjects.*', 'book-open'],
             ['Academic Terms', 'admin.semester-types.index', 'admin.semester-types.*', 'calendar'],
+            ['Attendance Settings', 'admin.attendance-settings.edit', 'admin.attendance-settings.*', 'adjustments'],
+        ]],
+        ['title' => 'System', 'items' => [
+            ['Audit Log', 'admin.audit-log.index', 'admin.audit-log.*', 'clock'],
         ]],
     ],
     'teacher' => [
@@ -51,6 +56,7 @@ $menus = [
         ]],
         ['title' => 'Teaching', 'items' => [
             ['My Subjects', 'teacher.subjects.index', ['teacher.subjects.*', 'teacher.grades.*'], 'book-open'],
+            ['Attendance', 'teacher.attendance.index', 'teacher.attendance.*', 'check-circle'],
             ['My Schedule', 'teacher.schedule', 'teacher.schedule', 'calendar'],
         ]],
         ['title' => 'Project Management', 'items' => [
@@ -68,6 +74,7 @@ $menus = [
         ]],
         ['title' => 'Academics', 'items' => [
             ['My Subjects', 'student.subjects', 'student.subjects', 'book-open'],
+            ['My Attendance', 'student.attendance', 'student.attendance', 'check-circle'],
             ['Grades & Transcript', 'student.grades', 'student.grades', 'document-text'],
             ['My Schedule', 'student.schedule', 'student.schedule', 'calendar'],
         ]],

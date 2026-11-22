@@ -39,6 +39,11 @@ use App\Http\Controllers\RepositoryController;
 use App\Http\Controllers\Admin\ProjectController as AdminProjectController;
 use App\Http\Controllers\Admin\SupervisionController;
 use App\Http\Controllers\Teacher\ProjectController as TeacherProjectController;
+use App\Http\Controllers\Teacher\AttendanceController as TeacherAttendanceController;
+use App\Http\Controllers\Admin\AttendanceController as AdminAttendanceController;
+use App\Http\Controllers\Admin\AttendanceSettingsController;
+use App\Http\Controllers\Admin\AuditLogController;
+use App\Http\Controllers\Student\AttendanceController as StudentAttendanceController;
 
 
 Route::redirect('/', '/login');
@@ -106,10 +111,28 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('grades', [AdminGradeController::class, 'index'])->name('grades.index');
         Route::get('subjects/{subject}/grades', [AdminGradeController::class, 'show'])->name('grades.show');
         Route::put('subjects/{subject}/grades', [AdminGradeController::class, 'update'])->name('grades.update');
+        Route::post('subjects/{subject}/grades/publish', [AdminGradeController::class, 'publish'])->name('grades.publish');
+        Route::post('subjects/{subject}/grades/unpublish', [AdminGradeController::class, 'unpublish'])->name('grades.unpublish');
+        Route::post('subjects/{subject}/grades/return', [AdminGradeController::class, 'returnToTeacher'])->name('grades.return');
         Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
+        // Attendance: faculty -> department -> class -> semester -> subject
+        Route::get('attendance', [AdminAttendanceController::class, 'index'])->name('attendance.index');
+        Route::get('attendance/sessions/{attendanceSession}', [AdminAttendanceController::class, 'session'])->name('attendance.session');
+        Route::post('attendance/sessions/{attendanceSession}/lock', [AdminAttendanceController::class, 'lock'])->name('attendance.lock');
+        Route::post('attendance/sessions/{attendanceSession}/unlock', [AdminAttendanceController::class, 'unlock'])->name('attendance.unlock');
+        Route::get('attendance/{subject}', [AdminAttendanceController::class, 'show'])->name('attendance.show');
+        Route::post('attendance/{subject}/lock-all', [AdminAttendanceController::class, 'lockAll'])->name('attendance.lock-all');
+        Route::post('attendance/{subject}/unlock-all', [AdminAttendanceController::class, 'unlockAll'])->name('attendance.unlock-all');
+
+        Route::get('attendance-settings', [AttendanceSettingsController::class, 'edit'])->name('attendance-settings.edit');
+        Route::put('attendance-settings', [AttendanceSettingsController::class, 'update'])->name('attendance-settings.update');
+        Route::put('attendance-settings/semesters/{semester}', [AttendanceSettingsController::class, 'updateSemester'])->name('attendance-settings.semester');
+
+        Route::get('audit-log', [AuditLogController::class, 'index'])->name('audit-log.index');
         Route::get('configuration', [ConfigurationController::class, 'index'])->name('configuration.index');
         Route::resource('semester-types', SemesterTypeController::class)->only(['index', 'store', 'update', 'destroy']);
         Route::post('classes/{classGroup}/process-results', [ClassGroupController::class, 'processResults'])->name('classes.process-results');
+        Route::post('classes/{classGroup}/publish-grades', [ClassGroupController::class, 'publishGrades'])->name('classes.publish-grades');
         Route::get('supervision', [SupervisionController::class, 'index'])->name('supervision.index');
         Route::put('supervision/{student}', [SupervisionController::class, 'update'])->name('supervision.update');
         Route::get('projects', [AdminProjectController::class, 'index'])->name('projects.index');
@@ -122,7 +145,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('subjects/{subject}', [TeacherSubjectController::class, 'show'])->name('subjects.show');
         Route::get('subjects/{subject}/grades', [TeacherGradeController::class, 'edit'])->name('grades.edit');
         Route::put('subjects/{subject}/grades', [TeacherGradeController::class, 'update'])->name('grades.update');
+        Route::post('subjects/{subject}/grades/submit', [TeacherGradeController::class, 'submit'])->name('grades.submit');
         Route::get('schedule', [TeacherScheduleController::class, 'index'])->name('schedule');
+        Route::get('attendance', [TeacherAttendanceController::class, 'index'])->name('attendance.index');
+        Route::get('attendance/sessions/{attendanceSession}/edit', [TeacherAttendanceController::class, 'edit'])->name('attendance.edit');
+        Route::put('attendance/sessions/{attendanceSession}', [TeacherAttendanceController::class, 'update'])->name('attendance.update');
+        Route::delete('attendance/sessions/{attendanceSession}', [TeacherAttendanceController::class, 'destroy'])->name('attendance.destroy');
+        Route::get('attendance/{subject}', [TeacherAttendanceController::class, 'show'])->name('attendance.show');
+        Route::put('attendance/{subject}/visibility', [TeacherAttendanceController::class, 'visibility'])->name('attendance.visibility');
+        Route::get('attendance/{subject}/create', [TeacherAttendanceController::class, 'create'])->name('attendance.create');
+        Route::post('attendance/{subject}', [TeacherAttendanceController::class, 'store'])->name('attendance.store');
         Route::get('projects', [TeacherProjectController::class, 'index'])->name('projects.index');
     });
 
@@ -131,6 +163,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('subjects', [StudentSubjectController::class, 'index'])->name('subjects');
         Route::get('grades', [StudentGradeController::class, 'index'])->name('grades');
         Route::get('schedule', [StudentScheduleController::class, 'index'])->name('schedule');
+        Route::get('attendance', [StudentAttendanceController::class, 'index'])->name('attendance');
         Route::get('project', [ProjectController::class, 'mine'])->name('project');
         Route::post('project', [ProjectController::class, 'store'])->name('project.store');
         });

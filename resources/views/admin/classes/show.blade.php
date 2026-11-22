@@ -36,6 +36,15 @@
                             Results
                         </a>
 
+                        <form action="{{ route('admin.classes.publish-grades', $classGroup) }}" method="POST"
+                            onsubmit="return confirm('Publish all grades of the current semester? The students will see them.');">
+                            @csrf
+                            <button type="submit"
+                                    class="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                Publish all grades
+                            </button>
+                        </form>
+
                         <form action="{{ route('admin.classes.process-results', $classGroup) }}" method="POST"
                             onsubmit="return confirm('Process the results? Failed subjects will move to the next chance.');">
                             @csrf

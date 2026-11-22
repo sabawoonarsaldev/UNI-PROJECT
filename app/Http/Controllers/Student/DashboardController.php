@@ -15,7 +15,7 @@ class DashboardController extends Controller
         $student = auth()->user();
         $student->load(['department', 'currentSemester']);
 
-        $grades = $student->grades()->with(['subject', 'semester.type'])->get();
+        $grades = $student->publishedGrades()->with(['subject', 'semester.type'])->get();
 
         $cgpa = GpaCalculator::gpa($grades);
 

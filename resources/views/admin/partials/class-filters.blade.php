@@ -1,6 +1,21 @@
-@php($select = 'rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500')
+@php
+    $select = 'rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500';
+    $withFaculty = $withFaculty ?? false;
+@endphp
 
 <form id="class-filter-form" method="GET" action="{{ $action }}" class="mb-4 flex flex-wrap items-center gap-2 text-sm">
+
+    {{-- Only on the pages that ask for it --}}
+    @if ($withFaculty)
+        <select name="faculty_id" data-resets="department_id,class_group_id,semester_id" class="{{ $select }}">
+            <option value="">All faculties</option>
+            @foreach ($faculties as $faculty)
+                <option value="{{ $faculty->id }}" @selected(request('faculty_id') == $faculty->id)>
+                    {{ $faculty->name }}
+                </option>
+            @endforeach
+        </select>
+    @endif
 
     <select name="department_id" data-resets="class_group_id,semester_id" class="{{ $select }}">
         <option value="">All departments</option>
@@ -36,7 +51,7 @@
         </select>
     @endif
 
-    @if (request('department_id') || request('class_group_id') || request('semester_id'))
+    @if (request('faculty_id') || request('department_id') || request('class_group_id') || request('semester_id'))
         <a href="{{ $action }}" class="text-gray-600 hover:underline">Reset</a>
     @endif
 </form>

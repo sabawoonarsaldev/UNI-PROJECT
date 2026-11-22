@@ -17,7 +17,7 @@ class SubjectController extends Controller
             ->get()
             ->sortBy(fn ($enrollment) => $enrollment->subject->code);
 
-        $grades = $student->grades()
+        $grades = $student->publishedGrades()
             ->where('semester_id', $student->current_semester_id)
             ->get()
             ->keyBy('subject_id');
