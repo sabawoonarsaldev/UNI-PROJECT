@@ -10,18 +10,25 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use App\Models\ClassGroup;
 use App\Models\User;
+use App\Http\Controllers\Admin\Concerns\HasFacultyFilter;
+
 
 class ProjectController extends Controller
 {
+    use HasFacultyFilter;
+
     public function index(Request $request)
 {
-    $departmentId = $request->query('department_id');
     $classId = $request->query('class_group_id');
+    $departmentId = $request->query('department_id');
 
     $projects = Project::with(['student.classGroup.department', 'student.classGroup.entryTerm', 'supervisor', 'department'])
         ->withCount('files')
         ->search($request->query('q'))
         ->when($request->query('status'), fn ($query, $status) => $query->where('status', $status))
+        ->when($request->query('faculty_id'), function ($query, $id) {
+            $query->whereHas('department', fn ($department) => $department->where('faculty_id', $id));
+        })
         ->when($departmentId, fn ($query, $id) => $query->where('department_id', $id))
         // The projects of the students of one class
         ->when($classId, function ($query, $id) {
@@ -41,9 +48,11 @@ class ProjectController extends Controller
         ? User::where('role', 'student')->where('class_group_id', $classId)->orderBy('name')->get(['id', 'name', 'roll_number'])
         : collect();
 
-    $departments = Department::orderBy('name')->get();
-
-    return view('admin.projects.index', compact('projects', 'departments', 'classes', 'students'));
+    return view('admin.projects.index', [
+        'projects' => $projects,
+        'classes' => $classes,
+        'students' => $students,
+    ] + $this->facultyOptions($request));
 }
 
     public function destroy(Project $project)

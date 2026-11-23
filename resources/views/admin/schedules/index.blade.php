@@ -18,17 +18,7 @@
                 <div class="mb-4 p-4 bg-green-100 text-green-800 rounded-md">{{ session('success') }}</div>
             @endif
 
-            <form method="GET" action="{{ route('admin.schedules.index') }}" class="mb-4 flex items-center gap-2 text-sm">
-                <select name="department_id" onchange="this.form.submit()"
-                        class="border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                    <option value="">All departments</option>
-                    @foreach ($departments as $department)
-                        <option value="{{ $department->id }}" @selected(request('department_id') == $department->id)>
-                            {{ $department->name }}
-                        </option>
-                    @endforeach
-                </select>
-            </form>
+            @include('admin.partials.class-filters', ['action' => route('admin.schedules.index'), 'withFaculty' => true])
 
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <table class="min-w-full divide-y divide-gray-200">
@@ -37,7 +27,8 @@
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Day</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subject</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department / Semester</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Class</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Semester</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Teacher</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Room</th>
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -53,9 +44,8 @@
                                 <td class="px-6 py-4 text-sm text-gray-900">
                                     {{ $schedule->subject->code }} - {{ $schedule->subject->name }}
                                 </td>
-                                <td class="px-6 py-4 text-sm text-gray-500">
-                                    {{ $schedule->subject->department->name }} / {{ $schedule->subject->semester->name }}
-                                </td>
+                                <td class="px-6 py-4 text-sm text-gray-500">{{ $schedule->subject->semester->classGroup?->name ?? '-' }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-500">{{ $schedule->subject->semester->name }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-500">{{ $schedule->subject->teacher?->name ?? 'Not assigned' }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-500">{{ $schedule->room ?? '-' }}</td>
                                 <td class="px-6 py-4 text-sm text-right space-x-2">
@@ -73,8 +63,8 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="px-6 py-8 text-center text-gray-500">
-                                    No schedules yet. Click "Add Schedule" to create the first one.
+                                <td colspan="8" class="px-6 py-8 text-center text-gray-500">
+                                    No schedules found for this selection.
                                 </td>
                             </tr>
                         @endforelse

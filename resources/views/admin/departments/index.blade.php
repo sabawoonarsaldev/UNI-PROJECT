@@ -15,10 +15,24 @@
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
 
             @if (session('success'))
-                <div class="mb-4 p-4 bg-green-100 text-green-800 rounded-md">
-                    {{ session('success') }}
-                </div>
+                <div class="mb-4 p-4 bg-green-100 text-green-800 rounded-md">{{ session('success') }}</div>
             @endif
+
+            <form method="GET" action="{{ route('admin.departments.index') }}" class="mb-4 flex items-center gap-2 text-sm">
+                <select name="faculty_id" onchange="this.form.submit()"
+                        class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <option value="">All faculties</option>
+                    @foreach ($faculties as $faculty)
+                        <option value="{{ $faculty->id }}" @selected(request('faculty_id') == $faculty->id)>{{ $faculty->name }}</option>
+                    @endforeach
+                </select>
+
+                @if (request('faculty_id'))
+                    <a href="{{ route('admin.departments.index') }}" class="text-gray-600 hover:underline">Reset</a>
+                @endif
+
+                <span class="ms-auto text-gray-500">{{ $departments->count() }} department(s)</span>
+            </form>
 
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <table class="min-w-full divide-y divide-gray-200">
@@ -52,7 +66,7 @@
                         @empty
                             <tr>
                                 <td colspan="4" class="px-6 py-8 text-center text-gray-500">
-                                    No departments yet. Click "Add Department" to create the first one.
+                                    No departments found for this selection.
                                 </td>
                             </tr>
                         @endforelse

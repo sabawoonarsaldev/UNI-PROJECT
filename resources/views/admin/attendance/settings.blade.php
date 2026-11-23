@@ -60,6 +60,14 @@
                     sessions are planned, so a longer or shorter semester changes the allowed absences automatically.
                 </p>
 
+                <div class="px-6 pt-4">
+                    @include('admin.partials.class-filters', [
+                        'action' => route('admin.attendance-settings.edit'),
+                        'withFaculty' => true,
+                        'withSemester' => false,
+                    ])
+                </div>
+
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">

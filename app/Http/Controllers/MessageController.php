@@ -2,48 +2,94 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Admin\Concerns\HasFacultyFilter;
 use App\Models\Message;
 use App\Models\User;
 use Illuminate\Http\Request;
 
 class MessageController extends Controller
 {
-    // List of conversations, the most recent first
-    public function index()
-    {
-        $me = auth()->id();
+    use HasFacultyFilter;
 
-        $messages = Message::with(['sender', 'receiver'])
-            ->where('sender_id', $me)
-            ->orWhere('receiver_id', $me)
+    // List of conversations, the most recent first. The admin can search and filter by faculty and department.
+    public function index(Request $request)
+    {
+        $me = auth()->user();
+
+        $messages = Message::with(['sender.department', 'receiver.department'])
+            ->where('sender_id', $me->id)
+            ->orWhere('receiver_id', $me->id)
             ->latest()
             ->get();
 
         $conversations = $messages
-            ->groupBy(fn ($message) => $message->sender_id == $me ? $message->receiver_id : $message->sender_id)
+            ->groupBy(fn ($message) => $message->sender_id == $me->id ? $message->receiver_id : $message->sender_id)
             ->map(function ($group) use ($me) {
                 $latest = $group->first();
 
                 return [
-                    'user' => $latest->sender_id == $me ? $latest->receiver : $latest->sender,
+                    'user' => $latest->sender_id == $me->id ? $latest->receiver : $latest->sender,
                     'latest' => $latest,
-                    'unread' => $group->where('receiver_id', $me)->where('is_read', false)->count(),
+                    'group' => $group,
+                    'unread' => $group->where('receiver_id', $me->id)->where('is_read', false)->count(),
                 ];
             });
 
-        return view('messages.index', compact('conversations'));
+        $term = mb_strtolower(trim((string) $request->query('q')));
+        $facultyId = $request->query('faculty_id');
+        $departmentId = $request->query('department_id');
+
+        $conversations = $conversations->filter(function ($conversation) use ($term, $facultyId, $departmentId) {
+            $user = $conversation['user'];
+
+            // The name of the person, or any message of the conversation
+            if ($term !== '' && ! str_contains(mb_strtolower($user->name), $term)
+                && ! $conversation['group']->contains(fn ($message) => str_contains(mb_strtolower($message->body), $term))) {
+                return false;
+            }
+
+            if ($departmentId && $user->department_id != $departmentId) {
+                return false;
+            }
+
+            if ($facultyId && $user->department?->faculty_id != $facultyId) {
+                return false;
+            }
+
+            return true;
+        });
+
+        return view('messages.index', [
+            'conversations' => $conversations,
+            'isAdmin' => $me->role === 'admin',
+        ] + $this->facultyOptions($request));
     }
 
-    // Choose who to write to
-    public function create()
+    // Choose who to write to. The admin finds the person by search, faculty, department and role.
+    public function create(Request $request)
     {
         $me = auth()->user();
+        $isAdmin = $me->role === 'admin';
 
-        $recipients = $me->role === 'admin'
-            ? User::withAccount()->whereIn('role', ['teacher', 'student'])->orderBy('role')->orderBy('name')->get()
-            : User::where('role', 'admin')->orderBy('name')->get();
+        if ($isAdmin) {
+            $query = User::withAccount()
+                ->with('department.faculty')
+                ->whereIn('role', ['teacher', 'student'])
+                ->when($request->query('role') && in_array($request->query('role'), ['teacher', 'student']),
+                    fn ($q) => $q->where('role', $request->query('role')));
 
-        return view('messages.create', compact('recipients'));
+            $query = $this->limitUsersToFaculty($query, $request)->search($request->query('q'));
+        } else {
+            // Teachers and students can write only to the admins
+            $query = User::where('role', 'admin');
+        }
+
+        $recipients = $query->orderBy('role')->orderBy('name')->paginate(20)->withQueryString();
+
+        return view('messages.create', [
+            'recipients' => $recipients,
+            'isAdmin' => $isAdmin,
+        ] + $this->facultyOptions($request));
     }
 
     public function start(Request $request)
@@ -98,19 +144,17 @@ class MessageController extends Controller
         return redirect()->route('messages.show', $user);
     }
 
-    // Admins can write to teachers and students; teachers and students can only write to admins
-
+    // Admins can write to teachers and students who have an account; teachers and students only to admins
     private function canMessage(User $me, User $other): bool
-{
-    if ($me->id === $other->id) {
-        return false;
+    {
+        if ($me->id === $other->id) {
+            return false;
+        }
+
+        if ($me->role === 'admin') {
+            return in_array($other->role, ['teacher', 'student']) && $other->hasAccount();
+        }
+
+        return $other->role === 'admin';
     }
-
-    if ($me->role === 'admin') {
-        return in_array($other->role, ['teacher', 'student']) && $other->hasAccount();
-    }
-
-    return $other->role === 'admin';
-}
-
 }

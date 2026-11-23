@@ -9,12 +9,19 @@ use Illuminate\Http\Request;
 
 class DepartmentController extends Controller
 {
-    public function index()
-    {
-        $departments = Department::with('faculty')->latest()->get();
+public function index(Request $request)
+{
+    $departments = Department::with('faculty')
+        ->when($request->query('faculty_id'), fn ($query, $id) => $query->where('faculty_id', $id))
+        ->orderBy('faculty_id')
+        ->orderBy('name')
+        ->get();
 
-        return view('admin.departments.index', compact('departments'));
-    }
+    return view('admin.departments.index', [
+        'departments' => $departments,
+        'faculties' => Faculty::orderBy('name')->get(),
+    ]);
+}
 
     public function create()
     {

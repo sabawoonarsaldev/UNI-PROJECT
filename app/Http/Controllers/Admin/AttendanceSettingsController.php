@@ -9,26 +9,39 @@ use App\Services\AttendanceService;
 use App\Support\Settings;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use App\Http\Controllers\Admin\Concerns\FiltersByClass;
 
 class AttendanceSettingsController extends Controller
 {
-    public function edit()
-    {
-        // The current semester of every active class: here the admin gives its start date and weeks
-        $semesters = Semester::where('is_active', true)
-            ->whereNotNull('class_group_id')
-            ->with(['classGroup.department', 'classGroup.entryTerm'])
-            ->get()
-            ->sortBy(fn ($semester) => $semester->classGroup->name)
-            ->values();
 
-        return view('admin.attendance.settings', [
-            'holidays' => AttendanceService::holidays(),
-            'minPercent' => AttendanceService::minPercent(),
-            'days' => AttendanceService::DAYS,
-            'semesters' => $semesters,
-        ]);
-    }
+use FiltersByClass;
+    
+public function edit(Request $request)
+{
+    // The current semester of every active class, filtered by faculty, department and class
+    $semesters = Semester::where('is_active', true)
+        ->whereNotNull('class_group_id')
+        ->when($request->query('class_group_id'), fn ($query, $id) => $query->where('class_group_id', $id))
+        ->whereHas('classGroup', function ($classGroup) use ($request) {
+            $classGroup
+                ->when($request->query('faculty_id'), function ($q, $id) {
+                    $q->whereHas('department', fn ($department) => $department->where('faculty_id', $id));
+                })
+                ->when($request->query('department_id'), fn ($q, $id) => $q->where('department_id', $id));
+        })
+        ->with(['classGroup.department', 'classGroup.entryTerm'])
+        ->get()
+        ->sortBy(fn ($semester) => $semester->classGroup->name)
+        ->values();
+
+    return view('admin.attendance.settings', [
+        'holidays' => AttendanceService::holidays(),
+        'minPercent' => AttendanceService::minPercent(),
+        'days' => AttendanceService::DAYS,
+        'semesters' => $semesters,
+    ] + $this->classFilterOptions($request));
+}
+
 
     public function update(Request $request)
     {

@@ -17,32 +17,39 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use App\Models\Enrollment;
+use App\Http\Controllers\Admin\Concerns\HasFacultyFilter;
 
 
 class ClassGroupController extends Controller
 {
-public function index(Request $request)
+    use HasFacultyFilter;
+
+
+    public function index(Request $request)
 {
+    $facultyId = $request->query('faculty_id');
     $departmentId = $request->query('department_id');
 
-    $classes = ClassGroup::with(['department.faculty', 'entryTerm'])
-        ->withCount('students')
-        ->when($departmentId, fn ($query, $id) => $query->where('department_id', $id))
+    // The classes of the selected faculty, department and year
+    $scope = function ($query) use ($facultyId, $departmentId) {
+        return $query
+            ->when($facultyId, function ($q, $id) {
+                $q->whereHas('department', fn ($department) => $department->where('faculty_id', $id));
+            })
+            ->when($departmentId, fn ($q, $id) => $q->where('department_id', $id));
+    };
+
+    $classes = $scope(ClassGroup::with(['department.faculty', 'entryTerm'])->withCount('students'))
         // The classes that started in this year, even if they are in a higher semester now
         ->when($request->query('entry_year'), fn ($query, $year) => $query->where('entry_year', $year))
         ->orderBy('department_id')
         ->orderByDesc('entry_year')
         ->get();
 
-    $departments = Department::orderBy('name')->get();
+    // The years in which a class started in the selected faculty and department
+    $years = $scope(ClassGroup::query())->distinct()->orderByDesc('entry_year')->pluck('entry_year');
 
-    // The years in which a class started in the selected department
-    $years = ClassGroup::when($departmentId, fn ($query, $id) => $query->where('department_id', $id))
-        ->distinct()
-        ->orderByDesc('entry_year')
-        ->pluck('entry_year');
-
-    return view('admin.classes.index', compact('classes', 'departments', 'years'));
+    return view('admin.classes.index', ['classes' => $classes, 'years' => $years] + $this->facultyOptions($request));
 }
 
 

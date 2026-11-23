@@ -12,8 +12,7 @@
                 Students are enrolled automatically when they join a class or when a subject is added.
                 Use this page for exceptions: choose a class to see its subjects one by one.
             </p>
-
-            @include('admin.partials.class-filters', ['action' => route('admin.enrollments.index')])
+@include('admin.partials.class-filters', ['action' => route('admin.enrollments.index'), 'withFaculty' => true])
 
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <table class="min-w-full divide-y divide-gray-200">

@@ -9,34 +9,36 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use App\Models\AuditLog;
+use App\Http\Controllers\Admin\Concerns\HasFacultyFilter;
+
 
 class SupervisionController extends Controller
 {
-    public function index(Request $request)
-    {
-        $students = User::where('role', 'student')
-            ->with(['department', 'supervisor', 'project', 'classGroup.department', 'classGroup.entryTerm'])
-            ->when($request->query('department_id'), fn ($query, $id) => $query->where('department_id', $id))
-            ->when($request->query('filter') === 'unassigned', fn ($query) => $query->whereNull('supervisor_id'))
-            ->when($request->query('q'), function ($query, $term) {
-                $query->where(fn ($q) => $q->where('name', 'like', "%{$term}%")->orWhere('roll_number', 'like', "%{$term}%"));
-            })
-            ->orderBy('name')
-            ->paginate(15)
-            ->withQueryString();
 
-        // Only teachers who can log in can answer their students
-        $teachers = User::withAccount()
-            ->where('role', 'teacher')
-            ->with('department')
-            ->withCount('supervisedStudents')
-            ->orderBy('name')
-            ->get();
+use HasFacultyFilter;
+    
 
-        $departments = Department::orderBy('name')->get();
+public function index(Request $request)
+{
+    $students = $this->limitUsersToFaculty(User::where('role', 'student'), $request)
+        ->with(['department', 'supervisor.department.faculty', 'project', 'classGroup.department', 'classGroup.entryTerm'])
+        ->when($request->query('filter') === 'unassigned', fn ($query) => $query->whereNull('supervisor_id'))
+        ->when($request->query('q'), function ($query, $term) {
+            $query->where(fn ($q) => $q->where('name', 'like', "%{$term}%")->orWhere('roll_number', 'like', "%{$term}%"));
+        })
+        ->orderBy('name')
+        ->paginate(15)
+        ->withQueryString();
 
-        return view('admin.supervision.index', compact('students', 'teachers', 'departments'));
-    }
+    // Only teachers who can log in can answer their students; they follow the selected faculty and department
+    $teachers = $this->limitUsersToFaculty(User::withAccount()->where('role', 'teacher'), $request)
+        ->with('department.faculty')
+        ->withCount('supervisedStudents')
+        ->orderBy('name')
+        ->get();
+
+    return view('admin.supervision.index', ['students' => $students, 'teachers' => $teachers] + $this->facultyOptions($request));
+}
 
 public function update(Request $request, User $student)
 {

@@ -9,26 +9,30 @@ use App\Models\Subject;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use App\Http\Controllers\Admin\Concerns\FiltersByClass;
 
 class ClassScheduleController extends Controller
 {
+    use FiltersByClass;
     private const DAYS = ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
-    public function index(Request $request)
-    {
-        $schedules = ClassSchedule::with(['subject.department', 'subject.semester', 'subject.teacher'])
-            ->when($request->department_id, function ($query, $id) {
-                $query->whereHas('subject', fn ($subject) => $subject->where('department_id', $id));
-            })
-            ->orderByRaw("FIELD(day, '" . implode("','", self::DAYS) . "')")
-            ->orderBy('start_time')
-            ->paginate(15)
-            ->withQueryString();
+public function index(Request $request)
+{
+    $schedules = ClassSchedule::with([
+            'subject.semester.classGroup.department',
+            'subject.semester.classGroup.entryTerm',
+            'subject.teacher',
+        ])
+        // The same filters as the other pages: faculty, department, class, semester
+        ->whereHas('subject', fn ($subject) => $this->applyClassFilters($subject, $request))
+        ->orderByRaw("FIELD(day, '" . implode("','", self::DAYS) . "')")
+        ->orderBy('start_time')
+        ->paginate(15)
+        ->withQueryString();
 
-        $departments = Department::orderBy('name')->get();
+    return view('admin.schedules.index', ['schedules' => $schedules] + $this->classFilterOptions($request));
+}
 
-        return view('admin.schedules.index', compact('schedules', 'departments'));
-    }
 
     public function create()
     {

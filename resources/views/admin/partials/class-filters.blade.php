@@ -1,11 +1,13 @@
 @php
     $select = 'rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500';
     $withFaculty = $withFaculty ?? false;
+    $withSemester = $withSemester ?? true;
+    // With the faculty dropdown, the department dropdown appears only after a faculty is chosen
+    $showDepartment = ! $withFaculty || request('faculty_id');
 @endphp
 
 <form id="class-filter-form" method="GET" action="{{ $action }}" class="mb-4 flex flex-wrap items-center gap-2 text-sm">
 
-    {{-- Only on the pages that ask for it --}}
     @if ($withFaculty)
         <select name="faculty_id" data-resets="department_id,class_group_id,semester_id" class="{{ $select }}">
             <option value="">All faculties</option>
@@ -17,17 +19,19 @@
         </select>
     @endif
 
-    <select name="department_id" data-resets="class_group_id,semester_id" class="{{ $select }}">
-        <option value="">All departments</option>
-        @foreach ($departments as $department)
-            <option value="{{ $department->id }}" @selected(request('department_id') == $department->id)>
-                {{ $department->name }}
-            </option>
-        @endforeach
-    </select>
+    @if ($showDepartment)
+        <select name="department_id" data-resets="class_group_id,semester_id" class="{{ $select }}">
+            <option value="">All departments</option>
+            @foreach ($departments as $department)
+                <option value="{{ $department->id }}" @selected(request('department_id') == $department->id)>
+                    {{ $department->name }}
+                </option>
+            @endforeach
+        </select>
+    @endif
 
     {{-- Appears after a department is chosen: every class of the department --}}
-    @if (request('department_id'))
+    @if ($showDepartment && request('department_id'))
         <select name="class_group_id" data-resets="semester_id" class="{{ $select }}">
             <option value="">All classes</option>
             @foreach ($classes as $group)
@@ -40,7 +44,7 @@
     @endif
 
     {{-- Appears after a class is chosen: every semester of that class --}}
-    @if (request('class_group_id') && $semesters->isNotEmpty())
+    @if ($withSemester && $showDepartment && request('class_group_id') && $semesters->isNotEmpty())
         <select name="semester_id" class="{{ $select }}">
             <option value="">All semesters</option>
             @foreach ($semesters as $semester)

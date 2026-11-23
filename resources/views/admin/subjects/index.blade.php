@@ -18,9 +18,7 @@
             @if (session('success'))
                 <div class="mb-4 p-4 bg-green-100 text-green-800 rounded-md">{{ session('success') }}</div>
             @endif
-
-            @include('admin.partials.class-filters', ['action' => route('admin.subjects.index')])
-
+            @include('admin.partials.class-filters', ['action' => route('admin.subjects.index'), 'withFaculty' => true])
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">

@@ -24,7 +24,7 @@
                         <tr>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Audience</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
+<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Faculty / Department</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Published</th>
                             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                         </tr>
@@ -36,7 +36,7 @@
                                 <td class="px-6 py-4 text-sm text-gray-500">
                                     {{ ['all' => 'Everyone', 'teacher' => 'Teachers', 'student' => 'Students'][$announcement->target_role] }}
                                 </td>
-                                <td class="px-6 py-4 text-sm text-gray-500">{{ $announcement->department?->name ?? 'All departments' }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-500">{{ $announcement->audienceLabel() }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-500">{{ $announcement->created_at->format('Y-m-d H:i') }}</td>
                                 <td class="px-6 py-4 text-sm text-right space-x-2">
                                     <a href="{{ route('admin.announcements.edit', $announcement) }}"

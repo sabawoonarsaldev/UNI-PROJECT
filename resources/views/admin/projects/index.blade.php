@@ -3,7 +3,9 @@
         <h2 class="text-xl font-semibold leading-tight text-gray-800">All Projects</h2>
     </x-slot>
 
-    @php($select = 'rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500')
+    @php
+        $select = 'rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500';
+    @endphp
 
     <div class="py-8">
         <div class="mx-auto max-w-7xl space-y-4 px-4 sm:px-6 lg:px-8">
@@ -12,27 +14,22 @@
                 <div class="rounded-md bg-green-100 p-4 text-sm text-green-800">{{ session('success') }}</div>
             @endif
 
-            <form id="project-filter-form" method="GET" action="{{ route('admin.projects.index') }}"
-                  class="flex flex-wrap items-center gap-2 text-sm">
+            {{-- Faculty -> department -> class -> student --}}
+            <form method="GET" action="{{ route('admin.projects.index') }}" class="flex flex-wrap items-center gap-2 text-sm">
                 <input type="text" name="q" value="{{ request('q') }}" placeholder="Search projects" class="{{ $select }}">
 
-                <select name="status" class="{{ $select }}">
+                <select name="status" data-auto-submit class="{{ $select }}">
                     <option value="">All statuses</option>
                     @foreach (['draft' => 'Draft', 'submitted' => 'Waiting for supervisor', 'revision' => 'Revision requested', 'supervisor_approved' => 'Waiting for admin approval', 'approved' => 'Approved'] as $value => $label)
                         <option value="{{ $value }}" @selected(request('status') === $value)>{{ $label }}</option>
                     @endforeach
                 </select>
 
-                <select name="department_id" data-resets="class_group_id,student_id" class="{{ $select }}">
-                    <option value="">All departments</option>
-                    @foreach ($departments as $department)
-                        <option value="{{ $department->id }}" @selected(request('department_id') == $department->id)>{{ $department->name }}</option>
-                    @endforeach
-                </select>
+                @include('admin.partials.faculty-department', ['extraResets' => 'class_group_id,student_id'])
 
                 {{-- Appears after a department is chosen --}}
                 @if (request('department_id'))
-                    <select name="class_group_id" data-resets="student_id" class="{{ $select }}">
+                    <select name="class_group_id" data-auto-submit data-resets="student_id" class="{{ $select }}">
                         <option value="">All classes</option>
                         @foreach ($classes as $group)
                             <option value="{{ $group->id }}" @selected(request('class_group_id') == $group->id)>
@@ -45,7 +42,7 @@
 
                 {{-- Appears after a class is chosen: the students of this class --}}
                 @if (request('class_group_id'))
-                    <select name="student_id" class="{{ $select }}">
+                    <select name="student_id" data-auto-submit class="{{ $select }}">
                         <option value="">All students of the class</option>
                         @foreach ($students as $student)
                             <option value="{{ $student->id }}" @selected(request('student_id') == $student->id)>
@@ -57,7 +54,7 @@
 
                 <button type="submit" class="rounded-md bg-gray-800 px-3 py-2 text-white hover:bg-gray-700">Search</button>
 
-                @if (request()->hasAny(['q', 'status', 'department_id', 'class_group_id', 'student_id']))
+                @if (request('q') || request('status') || request('faculty_id') || request('department_id') || request('class_group_id') || request('student_id'))
                     <a href="{{ route('admin.projects.index') }}" class="text-gray-600 hover:underline">Reset</a>
                 @endif
             </form>
@@ -112,18 +109,4 @@
             {{ $projects->links() }}
         </div>
     </div>
-
-    <script>
-        document.querySelectorAll('#project-filter-form select').forEach(select => {
-            select.addEventListener('change', () => {
-                // The dropdowns that depend on this one are cleared, so they never keep an old value
-                (select.dataset.resets || '').split(',').filter(Boolean).forEach(name => {
-                    const dependent = select.form.elements[name];
-                    if (dependent) dependent.value = '';
-                });
-
-                select.form.submit();
-            });
-        });
-    </script>
 </x-app-layout>

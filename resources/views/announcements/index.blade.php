@@ -15,7 +15,7 @@
                     </div>
 
                     <div class="mt-1 text-xs text-gray-500">
-                        {{ $announcement->department?->name ?? 'All departments' }}
+                        {{ $announcement->audienceLabel() }}
                         @if ($announcement->creator) | By {{ $announcement->creator->name }} @endif
                     </div>
 

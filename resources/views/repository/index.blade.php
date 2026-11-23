@@ -3,7 +3,9 @@
         <h2 class="text-xl font-semibold leading-tight text-gray-800">University Research Project Repository</h2>
     </x-slot>
 
-    @php($select = 'rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500')
+    @php
+        $select = 'rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500';
+    @endphp
 
     <div class="py-8">
         <div class="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
@@ -19,13 +21,9 @@
                     </button>
                 </div>
 
-                <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                    <select name="department_id" class="{{ $select }}">
-                        <option value="">All departments</option>
-                        @foreach ($departments as $department)
-                            <option value="{{ $department->id }}" @selected(request('department_id') == $department->id)>{{ $department->name }}</option>
-                        @endforeach
-                    </select>
+                <div class="flex flex-wrap items-center gap-3">
+                    {{-- Faculty first; the department dropdown appears after a faculty is chosen --}}
+                    @include('admin.partials.faculty-department')
 
                     <select name="type" class="{{ $select }}">
                         <option value="">All types</option>
@@ -63,7 +61,7 @@
                     </div>
                 @endif
 
-                @if (request()->hasAny(['q', 'department_id', 'type', 'year', 'supervisor_id', 'sort', 'keyword']))
+                @if (request('q') || request('faculty_id') || request('department_id') || request('type') || request('year') || request('supervisor_id') || request('sort') || request('keyword'))
                     <a href="{{ route('repository.index') }}" class="text-sm text-gray-600 hover:underline">Reset all filters</a>
                 @endif
             </form>
