@@ -46,16 +46,22 @@
                         <x-dropdown align="right" width="48">
                             <x-slot name="trigger">
                                 <button class="inline-flex items-center gap-2 rounded-md px-2 py-1 text-sm font-medium text-gray-600 hover:text-gray-900 focus:outline-none">
-                                    <span class="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 font-semibold text-indigo-700">
-                                        {{ strtoupper(mb_substr($authUser->name, 0, 1)) }}
-                                    </span>
+                                    @if ($authUser->photo_path)
+    <img src="{{ $authUser->photoUrl() }}" alt="" class="h-8 w-8 rounded-full object-cover">
+@else
+    <span class="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700">
+        {{ $authUser->initials() }}
+    </span>
+@endif
+
                                     <span class="hidden sm:block">{{ $authUser->name }}</span>
                                     <x-icon name="chevron-down" class="h-4 w-4" />
                                 </button>
                             </x-slot>
 
                             <x-slot name="content">
-                                <x-dropdown-link :href="route('profile.edit')">Profile</x-dropdown-link>
+<x-dropdown-link :href="route('my-profile')">My Profile</x-dropdown-link>
+<x-dropdown-link :href="route('profile.edit')">Account Settings</x-dropdown-link>
 
                                 <form method="POST" action="{{ route('logout') }}">
                                     @csrf

@@ -52,7 +52,8 @@ $menus = [
     ],
     'teacher' => [
         ['title' => null, 'items' => [
-            ['Dashboard', 'teacher.dashboard', 'teacher.dashboard', 'home'],
+['My Profile', 'my-profile', 'my-profile', 'user'],
+['Dashboard', 'teacher.dashboard', 'teacher.dashboard', 'home'],
         ]],
         ['title' => 'Teaching', 'items' => [
             ['My Subjects', 'teacher.subjects.index', ['teacher.subjects.*', 'teacher.grades.*'], 'book-open'],
@@ -70,7 +71,8 @@ $menus = [
     ],
     'student' => [
         ['title' => null, 'items' => [
-            ['Dashboard', 'student.dashboard', 'student.dashboard', 'home'],
+['My Profile', 'my-profile', 'my-profile', 'user'],
+['Dashboard', 'student.dashboard', 'student.dashboard', 'home'],
         ]],
         ['title' => 'Academics', 'items' => [
             ['My Subjects', 'student.subjects', 'student.subjects', 'book-open'],

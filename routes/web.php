@@ -44,6 +44,8 @@ use App\Http\Controllers\Admin\AttendanceController as AdminAttendanceController
 use App\Http\Controllers\Admin\AttendanceSettingsController;
 use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Student\AttendanceController as StudentAttendanceController;
+use App\Http\Controllers\MyProfileController;
+use App\Http\Controllers\UserPhotoController;
 
 
 Route::redirect('/', '/login');
@@ -55,8 +57,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         return match ($user->role) {
             'admin' => redirect()->route('admin.dashboard'),
-            'teacher' => redirect()->route('teacher.dashboard'),
-            'student' => redirect()->route('student.dashboard'),
+            'teacher' => redirect()->route('my-profile'),
+            'student' => redirect()->route('my-profile'),
         };
     })->name('dashboard');
 
@@ -67,7 +69,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('messages/start', [MessageController::class, 'start'])->name('messages.start');
     Route::get('messages/{user}', [MessageController::class, 'show'])->name('messages.show');
     Route::post('messages/{user}', [MessageController::class, 'store'])->name('messages.store');
-
+// The profile page: the first page of teachers and students after the login
+    Route::get('my-profile', [MyProfileController::class, 'show'])->name('my-profile');
+    Route::put('my-profile', [MyProfileController::class, 'update'])->name('my-profile.update');
+    Route::get('users/{user}/photo', [UserPhotoController::class, 'show'])->name('users.photo');
 
     // Project repository: every logged-in user can search the approved projects
     Route::get('repository', [RepositoryController::class, 'index'])->name('repository.index');
@@ -90,7 +95,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/dashboard', [AdminDashboard::class, 'index'])->name('dashboard');
         Route::resource('faculties', FacultyController::class)->except('show');
         Route::resource('departments', DepartmentController::class)->except('show');
-        Route::resource('users', UserController::class)->except('show');
+        Route::resource('users', UserController::class);
         Route::get('classes', [ClassGroupController::class, 'index'])->name('classes.index');
         Route::get('classes/create', [ClassGroupController::class, 'create'])->name('classes.create');
         Route::post('classes', [ClassGroupController::class, 'store'])->name('classes.store');

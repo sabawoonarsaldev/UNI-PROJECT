@@ -14,6 +14,25 @@ use Illuminate\Notifications\Notifiable;
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
+
+public const ACADEMIC_RANKS = [
+    'pohyalai' => 'Pohyalai (Assistant Lecturer)',
+    'pohanyar' => 'Pohanyar (Lecturer)',
+    'pohanmal' => 'Pohanmal (Assistant Professor)',
+    'pohandoy' => 'Pohandoy (Associate Professor)',
+    'pohanwal' => 'Pohanwal (Professor)',
+];
+
+public const EDUCATION_DEGREES = [
+    'bachelor' => 'Bachelor',
+    'master' => 'Master',
+    'doctorate' => 'Doctorate (PhD)',
+];
+
+public const GENDERS = [
+    'male' => 'Male',
+    'female' => 'Female',
+];
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
@@ -29,10 +48,13 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
-
-    protected $fillable = [
-    'name', 'email', 'password', 'role', 'department_id', 'roll_number', 'current_semester_id','class_group_id','academic_status','supervisor_id'
+protected $fillable = [
+    'name', 'email', 'password', 'role', 'department_id', 'roll_number',
+    'current_semester_id', 'class_group_id', 'academic_status', 'supervisor_id',
+    'photo_path', 'father_name', 'date_of_birth', 'gender', 'phone', 'address',
+    'academic_rank', 'education_degree', 'specialization', 'experience_years',
 ];
+
 
 public function department()
 {
@@ -120,5 +142,25 @@ public function publishedGrades()
 {
     return $this->hasMany(Grade::class, 'student_id')->where('status', 'published');
 }
+
+
+// The address of the photo (it is private: only the admin and the owner can open it)
+public function photoUrl(): ?string
+{
+    return $this->photo_path
+        ? route('users.photo', $this) . '?v=' . $this->updated_at?->timestamp
+        : null;
+}
+
+// "Ahmad Rahimi" -> "AR", shown when the user has no photo
+public function initials(): string
+{
+    return collect(preg_split('/\s+/u', trim($this->name)))
+        ->filter()
+        ->take(2)
+        ->map(fn ($part) => mb_strtoupper(mb_substr($part, 0, 1)))
+        ->implode('');
+}
+
 
 }

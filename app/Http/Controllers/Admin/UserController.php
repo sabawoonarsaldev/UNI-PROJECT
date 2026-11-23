@@ -12,6 +12,9 @@ use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 use App\Models\Faculty;
 use App\Models\AuditLog;
+use App\Services\ProfileData;
+use Illuminate\Support\Facades\Storage;
+
 
 class UserController extends Controller
 {
@@ -40,7 +43,23 @@ public function index(Request $request)
         return view('admin.users.create', $this->formData());
     }
 
-    
+
+
+
+    public function edit(User $user)
+    {
+        $user->load(['classGroup.department', 'classGroup.entryTerm']);
+
+        return view('admin.users.edit', $this->formData() + ['user' => $user]);
+    }
+
+
+// The profile page of a user (the admin sees everything and can edit)
+public function show(User $user)
+{
+    return view('admin.users.show', ProfileData::for($user));
+}
+
 public function store(Request $request)
 {
     // An admin always needs a login account; for the others it is optional
@@ -55,7 +74,7 @@ public function store(Request $request)
         'department_id' => ['nullable', 'required_if:role,teacher,student', 'exists:departments,id'],
         'roll_number' => ['nullable', 'required_if:role,student', 'unique:users,roll_number'],
         'class_group_id' => ['nullable', Rule::exists('class_groups', 'id')->where('status', 'active')],
-    ]);
+    ] + $this->profileRules());
 
     // Only students have a roll number and a class, and admins belong to no department
     if ($validated['role'] !== 'student') {
@@ -85,6 +104,9 @@ public function store(Request $request)
         unset($validated['password']);
     }
 
+    // The photo is stored and the fields that belong only to teachers are cleaned
+    $validated = $this->prepareProfile($request, $validated);
+
     $user = new User($validated);
 
     if ($wantsAccount) {
@@ -102,7 +124,7 @@ public function store(Request $request)
         $user
     );
 
-    return redirect()->route('admin.users.index')->with(
+    return redirect()->route('admin.users.show', $user)->with(
         'success',
         $wantsAccount
             ? 'User and login account created successfully.'
@@ -125,7 +147,7 @@ public function update(Request $request, User $user)
         'role' => ['required', Rule::in(['admin', 'teacher', 'student'])],
         'department_id' => ['nullable', 'required_if:role,teacher,student', 'exists:departments,id'],
         'roll_number' => ['nullable', 'required_if:role,student', Rule::unique('users', 'roll_number')->ignore($user->id)],
-    ]);
+    ] + $this->profileRules());
 
     if ($validated['role'] !== 'student') {
         $validated['roll_number'] = null;
@@ -154,6 +176,8 @@ public function update(Request $request, User $user)
     if ($user->id === auth()->id()) {
         $validated['role'] = $user->role;
     }
+
+    $validated = $this->prepareProfile($request, $validated, $user);
 
     $user->fill($validated);
 
@@ -197,20 +221,11 @@ public function update(Request $request, User $user)
         AuditLog::record('user.account_created', "A login account was created for {$user->name}.", $user);
     }
 
-    return redirect()->route('admin.users.index')->with(
+    return redirect()->route('admin.users.show', $user)->with(
         'success',
         $createdAccount ? 'User updated and the login account was created.' : 'User updated successfully.'
     );
 }
-
-
-    public function edit(User $user)
-    {
-        $user->load(['classGroup.department', 'classGroup.entryTerm']);
-
-        return view('admin.users.edit', $this->formData() + ['user' => $user]);
-    }
-
 
 public function destroy(User $user)
 {
@@ -232,6 +247,10 @@ public function destroy(User $user)
         ['name' => $user->name, 'email' => $user->email, 'role' => $user->role]
     );
 
+    if ($user->photo_path) {
+        Storage::delete($user->photo_path);
+    }
+
     $user->delete();
 
     return redirect()->route('admin.users.index')
@@ -249,6 +268,50 @@ private function formData(): array
             ->sortBy('name')
             ->values(),
     ];
+}
+
+// The details of the profile. A teacher must have an academic rank and an education degree.
+private function profileRules(): array
+{
+    return [
+        'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+        'remove_photo' => ['nullable', 'boolean'],
+        'father_name' => ['nullable', 'string', 'max:100'],
+        'date_of_birth' => ['nullable', 'date', 'before:today'],
+        'gender' => ['nullable', Rule::in(array_keys(User::GENDERS))],
+        'phone' => ['nullable', 'string', 'max:30'],
+        'address' => ['nullable', 'string', 'max:255'],
+        'academic_rank' => ['nullable', 'required_if:role,teacher', Rule::in(array_keys(User::ACADEMIC_RANKS))],
+        'education_degree' => ['nullable', 'required_if:role,teacher', Rule::in(array_keys(User::EDUCATION_DEGREES))],
+        'specialization' => ['nullable', 'string', 'max:150'],
+        'experience_years' => ['nullable', 'integer', 'min:0', 'max:60'],
+    ];
+}
+
+// Stores the photo (and removes the old one) and clears the fields that belong only to teachers
+private function prepareProfile(Request $request, array $data, ?User $user = null): array
+{
+    unset($data['photo'], $data['remove_photo']);
+
+    if ($request->hasFile('photo')) {
+        if ($user?->photo_path) {
+            Storage::delete($user->photo_path);
+        }
+
+        $data['photo_path'] = $request->file('photo')->store('photos/users');
+    } elseif ($user && $request->boolean('remove_photo') && $user->photo_path) {
+        Storage::delete($user->photo_path);
+        $data['photo_path'] = null;
+    }
+
+    if ($data['role'] !== 'teacher') {
+        $data['academic_rank'] = null;
+        $data['education_degree'] = null;
+        $data['specialization'] = null;
+        $data['experience_years'] = null;
+    }
+
+    return $data;
 }
 
 }

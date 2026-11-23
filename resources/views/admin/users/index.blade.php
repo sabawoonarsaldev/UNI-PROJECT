@@ -115,7 +115,18 @@
                         <tbody class="divide-y divide-gray-200">
                             @forelse ($users as $user)
                                 <tr>
-                                    <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ $user->name }}</td>
+                                    <td class="px-6 py-4 text-sm">
+    <a href="{{ route('admin.users.show', $user) }}"
+       class="flex items-center gap-3 font-medium text-gray-900 hover:text-indigo-600">
+        @if ($user->photo_path)
+            <img src="{{ $user->photoUrl() }}" alt="" class="h-9 w-9 rounded-full object-cover">
+        @else
+            <span class="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-600">{{ $user->initials() }}</span>
+        @endif
+        <span>{{ $user->name }}</span>
+    </a>
+</td>
+
                                     <td class="px-6 py-4 text-sm text-gray-500">{{ $user->email }}</td>
                                     <td class="px-6 py-4 text-sm text-gray-500">{{ ucfirst($user->role) }}</td>
                                     <td class="px-6 py-4 text-sm text-gray-500">{{ $user->department?->faculty?->name ?? '-' }}</td>
