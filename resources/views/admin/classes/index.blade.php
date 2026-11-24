@@ -53,7 +53,7 @@
                     <tbody class="divide-y divide-gray-200">
                         @forelse ($classes as $group)
                             @php
-                                $total = \App\Models\ClassGroup::TOTAL_SEMESTERS;
+                                $total = $group->total_semesters;
                                 $done = $group->status === 'completed' ? $total : $group->current_semester_number - 1;
                             @endphp
                             <tr>

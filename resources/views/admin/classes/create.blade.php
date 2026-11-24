@@ -8,7 +8,7 @@
             <div class="space-y-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
 
                 <p class="text-sm text-gray-600">
-                    A class goes through 8 semesters together. Semester 1 is created automatically with the class,
+                    A class goes through the semesters of its department together. Semester 1 is created automatically with the class,
                     and the next ones are created when you complete each semester.
                 </p>
 
@@ -63,6 +63,18 @@
                             <a href="{{ route('admin.semester-types.index') }}" class="underline">Add terms first</a>.
                         </p>
                     @endif
+
+                    <div>
+                        <x-input-label for="total_semesters" value="Number of semesters" />
+                        <select id="total_semesters" name="total_semesters" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            @for ($n = 1; $n <= \App\Models\CurriculumSubject::MAX_SEMESTERS; $n++)
+                                <option value="{{ $n }}" @selected(old('total_semesters', 8) == $n)>{{ $n }} semesters</option>
+                            @endfor
+                        </select>
+                        <x-input-error :messages="$errors->get('total_semesters')" class="mt-2" />
+                        <p class="mt-1 text-xs text-gray-500">Some departments study 8 semesters, some 10 or more.</p>
+                    </div>
 
                     <div class="rounded-md bg-gray-50 px-4 py-3 text-sm text-gray-600">
                         Class name: <span id="name-preview" class="font-semibold text-gray-900">-</span>

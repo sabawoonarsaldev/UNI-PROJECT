@@ -46,6 +46,8 @@ use App\Http\Controllers\Admin\AuditLogController;
 use App\Http\Controllers\Student\AttendanceController as StudentAttendanceController;
 use App\Http\Controllers\MyProfileController;
 use App\Http\Controllers\UserPhotoController;
+use App\Http\Controllers\Admin\CurriculumController;
+use App\Http\Controllers\Admin\ClassSubjectController;
 
 
 Route::redirect('/', '/login');
@@ -138,6 +140,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::resource('semester-types', SemesterTypeController::class)->only(['index', 'store', 'update', 'destroy']);
         Route::post('classes/{classGroup}/process-results', [ClassGroupController::class, 'processResults'])->name('classes.process-results');
         Route::post('classes/{classGroup}/publish-grades', [ClassGroupController::class, 'publishGrades'])->name('classes.publish-grades');
+        Route::post('classes/{classGroup}/reopen-semester', [ClassGroupController::class, 'reopenSemester'])->name('classes.reopen-semester');
+        Route::post('classes/{classGroup}/semesters/{semester}/subjects', [ClassSubjectController::class, 'store'])->name('classes.subjects.store');
+        Route::put('classes/{classGroup}/subjects/{subject}', [ClassSubjectController::class, 'update'])->name('classes.subjects.update');
+        Route::delete('classes/{classGroup}/subjects/{subject}', [ClassSubjectController::class, 'destroy'])->name('classes.subjects.destroy');
+        Route::resource('curriculum', CurriculumController::class)->except('show');
         Route::get('supervision', [SupervisionController::class, 'index'])->name('supervision.index');
         Route::put('supervision/{student}', [SupervisionController::class, 'update'])->name('supervision.update');
         Route::get('projects', [AdminProjectController::class, 'index'])->name('projects.index');

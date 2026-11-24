@@ -34,34 +34,17 @@ use FiltersByClass;
 }
 
 
-    public function create(Request $request)
-    {
-        return view('admin.subjects.create', $this->formData() + [
-            'selectedSemester' => $request->query('semester_id'),
-        ]);
-    }
+    // Subjects are created once in the curriculum and then chosen for a class from the class page
+public function create()
+{
+    return redirect()->route('admin.curriculum.create')
+        ->with('success', 'Subjects are created in the Curriculum. Choose them for a class from the class page.');
+}
 
-    public function store(Request $request)
-    {
-        $subject = Subject::create($this->validated($request));
-
-        // Every student of the class is enrolled in the new subject automatically
-    $studentIds = User::where('role', 'student')
-        ->where('academic_status', 'active')
-        ->where('class_group_id', $subject->semester->class_group_id)
-        ->pluck('id');
-
-        foreach ($studentIds as $studentId) {
-            Enrollment::firstOrCreate([
-                'student_id' => $studentId,
-                'subject_id' => $subject->id,
-                'semester_id' => $subject->semester_id,
-            ]);
-        }
-
-        return redirect()->route('admin.subjects.index')
-            ->with('success', "Subject created and {$studentIds->count()} student(s) enrolled.");
-    }
+public function store()
+{
+    return redirect()->route('admin.curriculum.index');
+}
 
     public function edit(Subject $subject)
     {
@@ -102,7 +85,7 @@ use FiltersByClass;
     {
         $rules = [
             'name' => 'required|string|max:255',
-            'code' => ['required', 'string', 'max:50', Rule::unique('subjects', 'code')->ignore($subject?->id)],
+            'code' => ['required', 'string', 'max:50', Rule::unique('subjects', 'code')->where('semester_id', $subject?->semester_id)->ignore($subject?->id)],
             'teacher_id' => ['nullable', Rule::exists('users', 'id')->where('role', 'teacher')],
             'credit_hours' => 'required|integer|min:1|max:10',
         ];

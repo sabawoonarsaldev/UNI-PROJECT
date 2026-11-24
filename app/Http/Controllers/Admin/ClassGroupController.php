@@ -18,7 +18,10 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use App\Models\Enrollment;
 use App\Http\Controllers\Admin\Concerns\HasFacultyFilter;
-
+use App\Models\AttendanceRecord;
+use App\Models\AttendanceSession;
+use App\Models\CurriculumSubject;
+use Illuminate\Support\Arr;
 
 class ClassGroupController extends Controller
 {
@@ -63,54 +66,121 @@ class ClassGroupController extends Controller
         ]);
     }
 
+   
     public function store(Request $request)
-    {
-        $data = $request->validate([
-            'department_id' => 'required|exists:departments,id',
-            'semester_type_id' => 'required|exists:semester_types,id',
-            'entry_year' => ['required', 'integer', Rule::in(HijriShamsi::years())],
+{
+    $data = $request->validate([
+        'department_id' => 'required|exists:departments,id',
+        'semester_type_id' => 'required|exists:semester_types,id',
+        'entry_year' => ['required', 'integer', Rule::in(HijriShamsi::years())],
+        'total_semesters' => ['required', 'integer', 'min:1', 'max:' . CurriculumSubject::MAX_SEMESTERS],
+    ]);
+
+    if (ClassGroup::where(Arr::only($data, ['department_id', 'semester_type_id', 'entry_year']))->exists()) {
+        throw ValidationException::withMessages([
+            'entry_year' => 'This class already exists for the selected department.',
         ]);
-
-        if (ClassGroup::where($data)->exists()) {
-            throw ValidationException::withMessages([
-                'entry_year' => 'This class already exists for the selected department.',
-            ]);
-        }
-
-        $term = SemesterType::findOrFail($data['semester_type_id']);
-
-        // The class and its first semester are created together
-        $classGroup = DB::transaction(function () use ($data, $term) {
-            $classGroup = ClassGroup::create($data + ['current_semester_number' => 1, 'status' => 'active']);
-
-            Semester::create([
-                'department_id' => $classGroup->department_id,
-                'class_group_id' => $classGroup->id,
-                'semester_type_id' => $term->id,
-                'year' => $data['entry_year'],
-                'number' => 1,
-                'name' => Semester::buildName(1, $term->name, $data['entry_year']),
-                'is_active' => true,
-            ]);
-
-            return $classGroup;
-        });
-
-        return redirect()->route('admin.classes.show', $classGroup)
-            ->with('success', 'Class created with its first semester. Now add students and subjects.');
     }
 
-    public function show(ClassGroup $classGroup)
-    {
-        $classGroup->load(['department.faculty', 'entryTerm', 'semesters.type']);
+    $term = SemesterType::findOrFail($data['semester_type_id']);
 
-        $currentSemester = $classGroup->currentSemester();
+    // The class and its first semester are created together; the subjects are chosen afterwards from the curriculum
+    $classGroup = DB::transaction(function () use ($data, $term) {
+        $classGroup = ClassGroup::create($data + ['current_semester_number' => 1, 'status' => 'active']);
 
-        $subjects = $currentSemester
-            ? $currentSemester->subjects()->with('teacher')->withCount(['enrollments', 'grades'])->orderBy('code')->get()
-            : collect();
+        Semester::create([
+            'department_id' => $classGroup->department_id,
+            'class_group_id' => $classGroup->id,
+            'semester_type_id' => $term->id,
+            'year' => $data['entry_year'],
+            'number' => 1,
+            'name' => Semester::buildName(1, $term->name, $data['entry_year']),
+            'is_active' => true,
+        ]);
 
-        $students = $classGroup->students()
+        return $classGroup;
+    });
+
+    return redirect()->route('admin.classes.show', $classGroup)
+        ->with('success', 'Class created with Semester 1. Now choose its subjects from the curriculum and add the students.');
+}
+
+
+    public function show(Request $request, ClassGroup $classGroup)
+{
+    $classGroup->load(['department.faculty', 'entryTerm', 'semesters.type']);
+
+    // The selected semester (S1, S2, ...). A semester without a record has not started yet.
+    $number = max(1, min($classGroup->total_semesters, (int) $request->query('semester', $classGroup->current_semester_number)));
+    $semester = $classGroup->semesters->firstWhere('number', $number);
+
+    $term = trim((string) $request->query('q'));
+    $subjects = collect();
+    $semesterStudents = collect();
+    $attendance = [];
+    $sessionCounts = collect();
+    $stats = ['students' => 0, 'graded' => 0, 'expected' => 0];
+    $available = collect();
+    $teachers = collect();
+    $curriculumTotal = 0;
+
+    if ($semester) {
+        $subjects = $semester->subjects()->with('teacher')->withCount(['enrollments', 'grades'])->orderBy('code')->get();
+        $subjectIds = $subjects->pluck('id');
+
+        // The students of the semester: everybody enrolled in its subjects
+        $studentIds = Enrollment::whereIn('subject_id', $subjectIds)->where('chance', 1)->pluck('student_id')->unique();
+
+        $semesterStudents = User::whereIn('id', $studentIds)
+            ->when($term !== '', function ($query) use ($term) {
+                $query->where(fn ($q) => $q->where('name', 'like', "%{$term}%")->orWhere('roll_number', 'like', "%{$term}%"));
+            })
+            ->orderBy('name')
+            ->get();
+
+        $stats = [
+            'students' => $studentIds->count(),
+            'graded' => $subjects->sum('grades_count'),
+            'expected' => $subjects->sum('enrollments_count'),
+        ];
+
+        // Present, absent and excused days of every student in every subject
+        $sessionCounts = AttendanceSession::whereIn('subject_id', $subjectIds)
+            ->selectRaw('subject_id, COUNT(*) as total')
+            ->groupBy('subject_id')
+            ->pluck('total', 'subject_id');
+
+        $records = AttendanceRecord::join('attendance_sessions', 'attendance_sessions.id', '=', 'attendance_records.attendance_session_id')
+            ->whereIn('attendance_sessions.subject_id', $subjectIds)
+            ->selectRaw('attendance_records.student_id, attendance_sessions.subject_id, attendance_records.status, COUNT(*) as total')
+            ->groupBy('attendance_records.student_id', 'attendance_sessions.subject_id', 'attendance_records.status')
+            ->get();
+
+        foreach ($records as $record) {
+            $attendance[$record->student_id][$record->subject_id][$record->status] = (int) $record->total;
+        }
+
+        // The curriculum of this department for this semester number: the subjects that can still be chosen
+        if ($classGroup->status === 'active' && $semester->is_active) {
+            $curriculum = CurriculumSubject::with('teacher')
+                ->where('department_id', $classGroup->department_id)
+                ->where('semester_number', $number)
+                ->orderBy('code')
+                ->get();
+
+            $offeredIds = $subjects->pluck('curriculum_subject_id')->filter();
+            $offeredCodes = $subjects->pluck('code');
+
+            $curriculumTotal = $curriculum->count();
+            $available = $curriculum
+                ->reject(fn ($item) => $offeredIds->contains($item->id) || $offeredCodes->contains($item->code))
+                ->values();
+            $teachers = User::where('role', 'teacher')->orderBy('name')->get(['id', 'name']);
+        }
+    }
+
+    // The members of the class (add and remove students)
+    $members = $classGroup->students()
         ->withCount([
             'grades',
             'enrollments as pending_retakes_count' => fn ($query) => $query->where('chance', '>', 1)->doesntHave('grade'),
@@ -118,17 +188,23 @@ class ClassGroupController extends Controller
         ->orderBy('name')
         ->get();
 
-        // Students of the same department who are not in any class yet
-        $available = $classGroup->status === 'active'
-            ? User::where('role', 'student')
-                ->where('department_id', $classGroup->department_id)
-                ->whereNull('class_group_id')
-                ->orderBy('name')
-                ->get()
-            : collect();
+    // Students of the same department who are not in any class yet
+    $freeStudents = $classGroup->status === 'active'
+        ? User::where('role', 'student')
+            ->where('department_id', $classGroup->department_id)
+            ->whereNull('class_group_id')
+            ->orderBy('name')
+            ->get()
+        : collect();
 
-        return view('admin.classes.show', compact('classGroup', 'currentSemester', 'subjects', 'students', 'available'));
-    }
+    $reopenNumber = $classGroup->lastCompletedNumber();
+    $reopenProblem = $reopenNumber ? $classGroup->reopenProblem() : 'No semester has been completed yet.';
+
+    return view('admin.classes.show', compact(
+        'classGroup', 'number', 'semester', 'term', 'subjects', 'semesterStudents', 'attendance', 'sessionCounts',
+        'stats', 'available', 'teachers', 'curriculumTotal', 'members', 'freeStudents', 'reopenNumber', 'reopenProblem'
+    ));
+}
 
     public function addStudents(Request $request, ClassGroup $classGroup)
     {
@@ -217,9 +293,24 @@ if ($unpublished > 0) {
 
     $message = $next
         ? "{$semester->name} completed. The class moved to {$next->name}. Now add the subjects of the new semester."
-        : "{$semester->name} completed. The class has finished all " . ClassGroup::TOTAL_SEMESTERS . ' semesters.';
+        : "{$semester->name} completed. The class has finished all " . $classGroup->total_semesters . ' semesters.';
 
     return $back->with('success', $message . $this->summaryMessage($summary));
+}
+
+// Undoes "Complete semester"
+public function reopenSemester(ClassGroup $classGroup)
+{
+    if ($problem = $classGroup->reopenProblem()) {
+        return back()->with('error', $problem);
+    }
+
+    $semester = $classGroup->reopenLastSemester();
+
+    AuditLog::record('class.semester_reopened', "{$semester->name} of {$classGroup->name} was reopened.", $classGroup);
+
+    return redirect()->route('admin.classes.show', [$classGroup, 'semester' => $semester->number])
+        ->with('success', "{$semester->name} is open again. The grades are published, so unpublish them from Grades if the teacher must change them.");
 }
 
 // Publishes the grades of all subjects of the current semester at once

@@ -4,13 +4,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class ClassGroup extends Model
 {
     public const TOTAL_SEMESTERS = 8;
 
     protected $fillable = [
-        'department_id', 'semester_type_id', 'entry_year', 'current_semester_number', 'status',
+        'department_id', 'semester_type_id', 'entry_year', 'current_semester_number', 'status', 'total_semesters',
     ];
 
     // Example: "Software Engineering - Fall 1405"
@@ -88,7 +89,7 @@ class ClassGroup extends Model
         $current = $this->currentSemester();
         $current->update(['is_active' => false]);
 
-        if ($this->current_semester_number >= self::TOTAL_SEMESTERS) {
+        if ($this->current_semester_number >= $this->total_semesters) {
             $this->update(['status' => 'completed']);
 
             return null;
@@ -124,6 +125,77 @@ class ClassGroup extends Model
 
         return $next;
     }
+
+    // The last completed semester: the one that can be reopened
+public function lastCompletedNumber(): ?int
+{
+    $number = $this->status === 'completed' ? $this->total_semesters : $this->current_semester_number - 1;
+
+    return $number >= 1 ? $number : null;
+}
+
+// Returns the reason why the last completed semester cannot be reopened, or null when it can
+public function reopenProblem(): ?string
+{
+    $number = $this->lastCompletedNumber();
+
+    if (! $number) {
+        return 'No semester has been completed yet.';
+    }
+
+    $semester = $this->semesters()->where('number', $number)->first();
+
+    if (! $semester || $semester->is_active) {
+        return 'This semester is not completed.';
+    }
+
+    // A retake of this semester that already has a mark cannot be undone
+    $subjectIds = $semester->subjects()->pluck('id');
+
+    if (Grade::whereIn('subject_id', $subjectIds)->where('chance', '>', 1)->exists()) {
+        return 'A retake of this semester already has a grade.';
+    }
+
+    // The semester that started after it must still be untouched
+    if ($this->status === 'active') {
+        $next = $this->currentSemester();
+
+        if ($next) {
+            $nextIds = $next->subjects()->pluck('id');
+
+            if (Grade::whereIn('subject_id', $nextIds)->exists() || AttendanceSession::whereIn('subject_id', $nextIds)->exists()) {
+                return 'The next semester already has grades or attendance.';
+            }
+        }
+    }
+
+    return null;
+}
+
+// Undoes "Complete semester": the last completed semester is open again
+public function reopenLastSemester(): Semester
+{
+    $number = $this->lastCompletedNumber();
+    $semester = $this->semesters()->where('number', $number)->firstOrFail();
+
+    DB::transaction(function () use ($number, $semester) {
+        // The empty semester that started after it is removed (with the subjects chosen for it)
+        if ($this->status === 'active') {
+            $this->currentSemester()?->delete();
+        }
+
+        // The retakes that were created when the semester was completed are removed
+        Enrollment::whereIn('subject_id', $semester->subjects()->pluck('id'))->where('chance', '>', 1)->delete();
+
+        $semester->update(['is_active' => true]);
+        $this->update(['current_semester_number' => $number, 'status' => 'active']);
+
+        // The results are not final any more; they are calculated again at the next "Complete semester"
+        $this->students()->update(['current_semester_id' => $semester->id, 'academic_status' => 'active']);
+    });
+
+    return $semester->refresh();
+}
 
     // Looks at the results of the completed semesters:
 // - a failed subject gets the next chance
