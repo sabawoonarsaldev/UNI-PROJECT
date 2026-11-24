@@ -15,6 +15,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class ClassSubjectController extends Controller
 {
@@ -28,12 +29,23 @@ class ClassSubjectController extends Controller
             'items.*.selected' => ['nullable', 'boolean'],
             'items.*.credit_hours' => ['nullable', 'integer', 'min:1', 'max:10'],
             'items.*.teacher_id' => ['nullable', Rule::exists('users', 'id')->where('role', 'teacher')],
+        ], [
+            'items.required' => 'Select at least one subject.',
         ]);
 
         $chosen = collect($data['items'])->filter(fn ($item) => ! empty($item['selected']));
 
         if ($chosen->isEmpty()) {
-            return back()->with('error', 'Select at least one subject.');
+            throw ValidationException::withMessages(['items' => 'Select at least one subject.']);
+        }
+
+        // Every chosen subject needs its credit hours and its teacher
+        foreach ($chosen as $input) {
+            if (empty($input['credit_hours']) || empty($input['teacher_id'])) {
+                throw ValidationException::withMessages([
+                    'items' => 'Choose the credit hours and the teacher of every selected subject.',
+                ]);
+            }
         }
 
         // Only subjects of the curriculum of this department and this semester number
@@ -59,15 +71,15 @@ class ClassSubjectController extends Controller
 
                 $input = $chosen[$item->id];
 
-                // The class gets its own copy: the teacher and the credits can differ from the curriculum
+                // The class gets its own copy of the subject, with its own teacher and credits
                 $subject = Subject::forceCreate([
                     'name' => $item->name,
                     'code' => $item->code,
                     'department_id' => $classGroup->department_id,
                     'semester_id' => $semester->id,
                     'curriculum_subject_id' => $item->id,
-                    'teacher_id' => $input['teacher_id'] ?? $item->teacher_id,
-                    'credit_hours' => $input['credit_hours'] ?? $item->credit_hours,
+                    'teacher_id' => $input['teacher_id'],
+                    'credit_hours' => $input['credit_hours'],
                 ]);
 
                 // Every active student of the class is enrolled in the new subject
@@ -99,7 +111,7 @@ class ClassSubjectController extends Controller
         abort_unless($subject->semester->class_group_id === $classGroup->id, 404);
 
         $data = $request->validate([
-            'teacher_id' => ['nullable', Rule::exists('users', 'id')->where('role', 'teacher')],
+            'teacher_id' => ['required', Rule::exists('users', 'id')->where('role', 'teacher')],
             'credit_hours' => ['required', 'integer', 'min:1', 'max:10'],
         ]);
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\ProfileData;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use App\Rules\AfghanPhone;
 
 class MyProfileController extends Controller
 {
@@ -21,11 +22,11 @@ class MyProfileController extends Controller
         $data = $request->validate([
             'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'remove_photo' => ['nullable', 'boolean'],
-            'phone' => ['nullable', 'string', 'max:30'],
+            'phone' => ['nullable', 'string', 'max:30', new AfghanPhone()],
             'address' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $changes = ['phone' => $data['phone'] ?? null, 'address' => $data['address'] ?? null];
+$changes = ['phone' => AfghanPhone::normalize($data['phone'] ?? null), 'address' => $data['address'] ?? null];
 
         if ($request->hasFile('photo')) {
             if ($user->photo_path) {

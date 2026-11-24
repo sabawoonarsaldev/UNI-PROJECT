@@ -68,14 +68,26 @@ public function index(Request $request)
             ->with('success', 'Schedule deleted successfully.');
     }
 
-    private function formData(): array
-    {
-        return [
-            'subjects' => Subject::with(['department', 'semester'])->orderBy('code')->get(),
-            'days' => self::DAYS,
-        ];
-    }
+private function formData(): array
+{
+    // When a schedule is edited, its own subject stays in the list even if its semester is closed
+    $own = request()->route('schedule')?->subject_id;
 
+    // The subjects of the current semester of the classes
+    $subjects = Subject::with('semester')
+        ->whereHas('semester', fn ($semester) => $semester->where('is_active', true)->whereNotNull('class_group_id'))
+        ->when($own, fn ($query) => $query->orWhere('id', $own))
+        ->orderBy('code')
+        ->get();
+
+    return [
+        'faculties' => \App\Models\Faculty::orderBy('name')->get(),
+        'departments' => \App\Models\Department::orderBy('name')->get(['id', 'name', 'faculty_id']),
+        'classes' => \App\Models\ClassGroup::with(['department', 'entryTerm'])->orderByDesc('entry_year')->get(),
+        'subjects' => $subjects,
+        'days' => self::DAYS,
+    ];
+}
     private function validated(Request $request, ?ClassSchedule $schedule = null): array
     {
         $data = $request->validate([

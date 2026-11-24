@@ -35,7 +35,7 @@
                     <div class="grid gap-4 sm:grid-cols-2">
                         <div>
                             <x-input-label for="phone" value="Phone" />
-                            <x-text-input id="phone" name="phone" type="text" class="mt-1 block w-full" :value="old('phone', $person->phone)" />
+                            <x-text-input id="phone" name="phone" type="text" class="mt-1 block w-full" :value="old('phone', $person->phone)" placeholder="0700123456" inputmode="tel" />
                             <x-input-error :messages="$errors->get('phone')" class="mt-2" />
                         </div>
                         <div>

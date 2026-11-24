@@ -162,153 +162,229 @@
                     </div>
                 @else
 
-                    {{-- Choose subjects from the curriculum --}}
-                    @if ($isCurrent)
-                        <x-panel :title="'Choose subjects from the curriculum (' . $classGroup->department->name . ', semester ' . $number . ')'">
-                            @if ($curriculumTotal === 0)
-                                <div class="px-6 py-8 text-center text-sm text-gray-500">
-                                    The curriculum of {{ $classGroup->department->name }} has no subject for semester {{ $number }} yet.
-                                    <a href="{{ route('admin.curriculum.create', ['department_id' => $classGroup->department_id, 'semester_number' => $number]) }}"
-                                       class="text-indigo-600 underline">Add subjects to the curriculum</a>.
+
+
+                {{-- Subjects of the semester, with the windows to add and to edit them --}}
+<x-panel :title="'Subjects of semester ' . $number . ' (' . $subjects->count() . ')'">
+    @if ($isCurrent)
+        <x-slot name="action">
+            <div x-data="{
+                    open: {{ $errors->has('items') ? 'true' : 'false' }},
+                    selected: {},
+                    ids: @js($available->pluck('id')->values()),
+                    setAll(value) { this.ids.forEach(id => this.selected[id] = value) },
+                    count() { return Object.values(this.selected).filter(Boolean).length }
+                 }"
+                 x-on:keydown.escape.window="open = false">
+
+                <button type="button" x-on:click="open = true"
+                        class="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700">
+                    + Add subject
+                </button>
+
+                {{-- The window with the subjects of the curriculum --}}
+                <div x-show="open" x-cloak class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
+                    <div class="fixed inset-0 bg-gray-900/50" x-on:click="open = false"></div>
+
+                    <div class="relative mx-auto my-8 w-full max-w-4xl rounded-xl bg-white text-left shadow-xl">
+                        <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+                            <h3 class="text-lg font-semibold text-gray-900">
+                                Add subjects: {{ $classGroup->department->name }}, semester {{ $number }}
+                            </h3>
+                            <button type="button" x-on:click="open = false" class="text-gray-400 hover:text-gray-600">
+                                <x-icon name="x-mark" class="h-6 w-6" />
+                            </button>
+                        </div>
+
+                        @if ($curriculumTotal === 0)
+                            <div class="px-6 py-10 text-center text-sm text-gray-500">
+                                The curriculum of {{ $classGroup->department->name }} has no subject for semester {{ $number }} yet.
+                                <a href="{{ route('admin.curriculum.create', ['department_id' => $classGroup->department_id, 'semester_number' => $number]) }}"
+                                   class="text-indigo-600 underline">Add subjects to the curriculum</a>.
+                            </div>
+                        @elseif ($available->isEmpty())
+                            <div class="px-6 py-10 text-center text-sm text-gray-500">
+                                All {{ $curriculumTotal }} subject(s) of the curriculum are already in this semester.
+                            </div>
+                        @else
+                            <form method="POST" action="{{ route('admin.classes.subjects.store', [$classGroup, $semester]) }}">
+                                @csrf
+
+                                <div class="flex flex-wrap items-center justify-between gap-2 px-6 pt-4 text-sm">
+                                    <span class="text-gray-600">
+                                        Tick the subjects this class studies. For every ticked subject choose the credit hours and the teacher.
+                                    </span>
+                                    <span class="flex gap-3 text-xs">
+                                        <button type="button" x-on:click="setAll(true)" class="text-indigo-600 hover:underline">Select all</button>
+                                        <button type="button" x-on:click="setAll(false)" class="text-gray-600 hover:underline">Clear</button>
+                                    </span>
                                 </div>
-                            @elseif ($available->isEmpty())
-                                <div class="px-6 py-6 text-sm text-gray-500">
-                                    All {{ $curriculumTotal }} subject(s) of the curriculum are already chosen for this semester.
-                                </div>
-                            @else
-                                <form method="POST" action="{{ route('admin.classes.subjects.store', [$classGroup, $semester]) }}">
-                                    @csrf
-                                    <div class="overflow-x-auto">
-                                        <table class="min-w-full divide-y divide-gray-100">
-                                            <thead class="bg-gray-50">
-                                                <tr>
-                                                    <th class="w-10 px-4 py-3"><input type="checkbox" id="select-all-subjects" class="rounded border-gray-300 text-indigo-600"></th>
-                                                    <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Code</th>
-                                                    <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Subject</th>
-                                                    <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Credits</th>
-                                                    <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Teacher</th>
+
+                                <div class="max-h-[60vh] overflow-y-auto px-6 py-3">
+                                    <table class="min-w-full">
+                                        <tbody class="divide-y divide-gray-100">
+                                            @foreach ($available as $item)
+                                                <tr class="align-top">
+                                                    <td class="py-3 pe-3">
+                                                        <input type="checkbox" x-model="selected[{{ $item->id }}]"
+                                                               class="rounded border-gray-300 text-indigo-600">
+                                                        <input type="hidden" name="items[{{ $item->id }}][selected]" value="1"
+                                                               x-bind:disabled="! selected[{{ $item->id }}]">
+                                                    </td>
+                                                    <td class="py-3 pe-3 text-sm font-medium text-gray-900">{{ $item->code }}</td>
+                                                    <td class="py-3 pe-3 text-sm text-gray-900">{{ $item->name }}</td>
+                                                    <td class="py-3 text-sm">
+                                                        <div x-show="! selected[{{ $item->id }}]" class="text-xs text-gray-400">
+                                                            Curriculum: {{ $item->credit_hours }} credits{{ $item->teacher ? ', ' . $item->teacher->name : '' }}. Tick to choose.
+                                                        </div>
+
+                                                        <div x-show="selected[{{ $item->id }}]" x-cloak class="flex flex-wrap items-center gap-3">
+                                                            <label class="text-xs text-gray-500">Credits
+                                                                <input type="number" min="1" max="10" value="{{ $item->credit_hours }}"
+                                                                       name="items[{{ $item->id }}][credit_hours]"
+                                                                       x-bind:disabled="! selected[{{ $item->id }}]"
+                                                                       x-bind:required="selected[{{ $item->id }}]"
+                                                                       class="ms-1 w-20 {{ $field }}">
+                                                            </label>
+
+                                                            <label class="text-xs text-gray-500">Teacher
+                                                                <select name="items[{{ $item->id }}][teacher_id]"
+                                                                        x-bind:disabled="! selected[{{ $item->id }}]"
+                                                                        x-bind:required="selected[{{ $item->id }}]"
+                                                                        class="ms-1 {{ $field }}">
+                                                                    <option value="">-- Select teacher --</option>
+                                                                    @foreach ($teachers as $teacher)
+                                                                        <option value="{{ $teacher->id }}" @selected($item->teacher_id === $teacher->id)>{{ $teacher->name }}</option>
+                                                                    @endforeach
+                                                                </select>
+                                                            </label>
+                                                        </div>
+                                                    </td>
                                                 </tr>
-                                            </thead>
-                                            <tbody class="divide-y divide-gray-100">
-                                                @foreach ($available as $item)
-                                                    <tr>
-                                                        <td class="px-4 py-3">
-                                                            <input type="checkbox" name="items[{{ $item->id }}][selected]" value="1"
-                                                                   class="subject-checkbox rounded border-gray-300 text-indigo-600">
-                                                        </td>
-                                                        <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ $item->code }}</td>
-                                                        <td class="px-4 py-3 text-sm text-gray-900">{{ $item->name }}</td>
-                                                        <td class="px-4 py-3">
-                                                            <input type="number" min="1" max="10" name="items[{{ $item->id }}][credit_hours]"
-                                                                   value="{{ $item->credit_hours }}" class="w-20 {{ $field }}">
-                                                        </td>
-                                                        <td class="px-4 py-3">
-                                                            <select name="items[{{ $item->id }}][teacher_id]" class="{{ $field }}">
-                                                                <option value="">-- Not assigned --</option>
-                                                                @foreach ($teachers as $teacher)
-                                                                    <option value="{{ $teacher->id }}" @selected($item->teacher_id === $teacher->id)>{{ $teacher->name }}</option>
-                                                                @endforeach
-                                                            </select>
-                                                        </td>
-                                                    </tr>
-                                                @endforeach
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
 
-                                    <div class="flex flex-wrap items-center gap-3 border-t border-gray-100 px-6 py-4">
-                                        <x-primary-button>Add selected subjects</x-primary-button>
-                                        <span class="text-xs text-gray-500">
-                                            The credits and the teacher can be different for this class. Every student of the class is enrolled automatically.
-                                        </span>
+                                <div class="flex items-center justify-between gap-3 border-t border-gray-100 px-6 py-4">
+                                    <span class="text-xs text-gray-500" x-text="count() + ' subject(s) selected'"></span>
+                                    <div class="flex gap-2">
+                                        <button type="button" x-on:click="open = false"
+                                                class="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Cancel</button>
+                                        <button type="submit" x-bind:disabled="count() === 0"
+                                                class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
+                                            Add selected subjects
+                                        </button>
                                     </div>
-                                </form>
+                                </div>
+                            </form>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </x-slot>
+    @endif
 
-                                <script>
-                                    document.getElementById('select-all-subjects').addEventListener('change', function () {
-                                        document.querySelectorAll('.subject-checkbox').forEach(box => box.checked = this.checked);
-                                    });
-                                </script>
-                            @endif
-                        </x-panel>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-100">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Code</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Subject</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Teacher</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Credits</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Graded</th>
+                    <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Days taken</th>
+                    @if ($isCurrent)
+                        <th class="px-4 py-3"></th>
                     @endif
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                @forelse ($subjects as $subject)
+                    <tr>
+                        <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ $subject->code }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-900">{{ $subject->name }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-500">{{ $subject->teacher?->name ?? 'Not assigned' }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-500">{{ $subject->credit_hours }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-500">{{ $subject->grades_count }} / {{ $subject->enrollments_count }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-500">{{ $sessionCounts[$subject->id] ?? 0 }}</td>
 
-                    {{-- Subjects of the semester --}}
-                    <x-panel :title="'Subjects of semester ' . $number . ' (' . $subjects->count() . ')'">
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-100">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Code</th>
-                                        <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Subject</th>
-                                        <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Teacher</th>
-                                        <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Credits</th>
-                                        <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Graded</th>
-                                        <th class="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Days taken</th>
-                                        @if ($isCurrent)
-                                            <th class="px-4 py-3"></th>
-                                        @endif
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-100">
-                                    @forelse ($subjects as $subject)
-                                        @php
-                                            $formId = 'subject-form-' . $subject->id;
-                                        @endphp
-                                        <tr>
-                                            <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ $subject->code }}</td>
-                                            <td class="px-4 py-3 text-sm text-gray-900">{{ $subject->name }}</td>
+                        @if ($isCurrent)
+                            <td class="px-4 py-3 text-right text-sm">
+                                {{-- The window to edit the credits and the teacher --}}
+                                <div x-data="{ open: false }" x-on:keydown.escape.window="open = false" class="inline">
+                                    <button type="button" x-on:click="open = true" class="text-indigo-600 hover:underline">Edit</button>
 
-                                            @if ($isCurrent)
-                                                <td class="px-4 py-3">
-                                                    <select form="{{ $formId }}" name="teacher_id" class="{{ $field }}">
-                                                        <option value="">-- Not assigned --</option>
+                                    <div x-show="open" x-cloak class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
+                                        <div class="fixed inset-0 bg-gray-900/50" x-on:click="open = false"></div>
+
+                                        <div class="relative mx-auto my-16 w-full max-w-md rounded-xl bg-white text-left shadow-xl">
+                                            <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+                                                <h3 class="text-lg font-semibold text-gray-900">Edit {{ $subject->code }}</h3>
+                                                <button type="button" x-on:click="open = false" class="text-gray-400 hover:text-gray-600">
+                                                    <x-icon name="x-mark" class="h-6 w-6" />
+                                                </button>
+                                            </div>
+
+                                            <form method="POST" action="{{ route('admin.classes.subjects.update', [$classGroup, $subject]) }}" class="space-y-4 p-6">
+                                                @csrf
+                                                @method('PUT')
+
+                                                <div class="rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                                                    {{ $subject->code }} - {{ $subject->name }}
+                                                </div>
+
+                                                <div>
+                                                    <label class="block text-sm font-medium text-gray-700">Credit hours</label>
+                                                    <input type="number" min="1" max="10" name="credit_hours" required
+                                                           value="{{ $subject->credit_hours }}" class="mt-1 w-full {{ $field }}">
+                                                </div>
+
+                                                <div>
+                                                    <label class="block text-sm font-medium text-gray-700">Teacher</label>
+                                                    <select name="teacher_id" required class="mt-1 w-full {{ $field }}">
+                                                        <option value="">-- Select teacher --</option>
                                                         @foreach ($teachers as $teacher)
                                                             <option value="{{ $teacher->id }}" @selected($subject->teacher_id === $teacher->id)>{{ $teacher->name }}</option>
                                                         @endforeach
                                                     </select>
-                                                </td>
-                                                <td class="px-4 py-3">
-                                                    <input form="{{ $formId }}" type="number" min="1" max="10" name="credit_hours"
-                                                           value="{{ $subject->credit_hours }}" class="w-20 {{ $field }}">
-                                                </td>
-                                            @else
-                                                <td class="px-4 py-3 text-sm text-gray-500">{{ $subject->teacher?->name ?? 'Not assigned' }}</td>
-                                                <td class="px-4 py-3 text-sm text-gray-500">{{ $subject->credit_hours }}</td>
-                                            @endif
+                                                </div>
 
-                                            <td class="px-4 py-3 text-sm text-gray-500">{{ $subject->grades_count }} / {{ $subject->enrollments_count }}</td>
-                                            <td class="px-4 py-3 text-sm text-gray-500">{{ $sessionCounts[$subject->id] ?? 0 }}</td>
+                                                <div class="flex justify-end gap-2">
+                                                    <button type="button" x-on:click="open = false"
+                                                            class="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Cancel</button>
+                                                    <button type="submit"
+                                                            class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">Save</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
 
-                                            @if ($isCurrent)
-                                                <td class="space-x-2 px-4 py-3 text-right text-sm">
-                                                    <form id="{{ $formId }}" method="POST" class="inline"
-                                                          action="{{ route('admin.classes.subjects.update', [$classGroup, $subject]) }}">
-                                                        @csrf
-                                                        @method('PUT')
-                                                        <button type="submit" class="text-indigo-600 hover:underline">Save</button>
-                                                    </form>
-                                                    <form method="POST" class="inline"
-                                                          action="{{ route('admin.classes.subjects.destroy', [$classGroup, $subject]) }}"
-                                                          onsubmit="return confirm('Remove this subject from the semester?');">
-                                                        @csrf
-                                                        @method('DELETE')
-                                                        <button type="submit" class="text-red-600 hover:underline">Remove</button>
-                                                    </form>
-                                                </td>
-                                            @endif
-                                        </tr>
-                                    @empty
-                                        <tr>
-                                            <td colspan="7" class="px-6 py-8 text-center text-sm text-gray-500">
-                                                No subjects were chosen for this semester yet.
-                                            </td>
-                                        </tr>
-                                    @endforelse
-                                </tbody>
-                            </table>
-                        </div>
-                    </x-panel>
+                                <form method="POST" class="ms-3 inline"
+                                      action="{{ route('admin.classes.subjects.destroy', [$classGroup, $subject]) }}"
+                                      onsubmit="return confirm('Remove this subject from the semester?');">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="text-red-600 hover:underline">Remove</button>
+                                </form>
+                            </td>
+                        @endif
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="7" class="px-6 py-8 text-center text-sm text-gray-500">
+                            No subjects were chosen for this semester yet.
+                            @if ($isCurrent) Click "+ Add subject" to choose them from the curriculum. @endif
+                        </td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+</x-panel>
+
 
                     {{-- Students of the semester with their attendance in every subject --}}
                     <x-panel :title="'Students and attendance (' . $stats['students'] . ')'">

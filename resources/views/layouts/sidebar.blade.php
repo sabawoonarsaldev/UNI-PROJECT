@@ -43,7 +43,6 @@ $menus = [
             ['Departments', 'admin.departments.index', 'admin.departments.*', 'squares'],
             ['Classes', 'admin.classes.index', 'admin.classes.*', 'academic-cap'],
             ['Curriculum', 'admin.curriculum.index', 'admin.curriculum.*', 'book-open'],
-            ['Class Subjects', 'admin.subjects.index', 'admin.subjects.*', 'squares'],
             ['Academic Terms', 'admin.semester-types.index', 'admin.semester-types.*', 'calendar'],
             ['Attendance Settings', 'admin.attendance-settings.edit', 'admin.attendance-settings.*', 'adjustments'],
         ]],

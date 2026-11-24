@@ -148,7 +148,7 @@
         <div>
             <x-input-label for="phone" value="Phone" />
             <x-text-input id="phone" name="phone" type="text" class="mt-1 block w-full"
-                          :value="old('phone', $user?->phone)" />
+                          :value="old('phone', $user?->phone)" placeholder="0700123456" inputmode="tel" />
             <x-input-error :messages="$errors->get('phone')" class="mt-2" />
         </div>
     </div>

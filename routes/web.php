@@ -10,7 +10,6 @@ use App\Http\Controllers\Student\DashboardController as StudentDashboard;
 use App\Http\Controllers\Admin\DepartmentController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\SemesterController;
-use App\Http\Controllers\Admin\SubjectController;
 use App\Http\Controllers\Admin\EnrollmentController;
 use App\Http\Controllers\Admin\ClassScheduleController;
 #teacher routes
@@ -107,7 +106,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('classes/{classGroup}/students/{student}', [ClassGroupController::class, 'removeStudent'])->name('classes.students.remove');
         Route::post('classes/{classGroup}/complete-semester', [ClassGroupController::class, 'completeSemester'])->name('classes.complete-semester');
         Route::get('classes/{classGroup}/results', [ClassGroupController::class, 'results'])->name('classes.results');
-        Route::resource('subjects', SubjectController::class)->except('show');
+        Route::redirect('subjects', '/admin/curriculum')->name('subjects.index');
+Route::redirect('subjects/create', '/admin/curriculum/create')->name('subjects.create');
         Route::get('enrollments', [EnrollmentController::class, 'index'])->name('enrollments.index');
         Route::get('subjects/{subject}/enrollments', [EnrollmentController::class, 'manage'])->name('enrollments.manage');
         Route::post('subjects/{subject}/enrollments', [EnrollmentController::class, 'store'])->name('enrollments.store');

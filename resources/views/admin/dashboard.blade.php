@@ -20,7 +20,7 @@
 
         $alerts = [];
         if ($warnings['subjects_without_teacher'] > 0) {
-            $alerts[] = [$warnings['subjects_without_teacher'] . ' subject(s) have no teacher', route('admin.subjects.index'), 'Assign teachers'];
+            $alerts[] = [$warnings['subjects_without_teacher'] . ' subject(s) have no teacher', route('admin.classes.index'), 'Open classes'];
         }
         if ($warnings['subjects_without_schedule'] > 0) {
             $alerts[] = [$warnings['subjects_without_schedule'] . ' subject(s) have no class schedule', route('admin.schedules.create'), 'Add schedule'];

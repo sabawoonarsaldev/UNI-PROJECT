@@ -14,7 +14,7 @@ use App\Models\Faculty;
 use App\Models\AuditLog;
 use App\Services\ProfileData;
 use Illuminate\Support\Facades\Storage;
-
+use App\Rules\AfghanPhone;
 
 class UserController extends Controller
 {
@@ -279,7 +279,7 @@ private function profileRules(): array
         'father_name' => ['nullable', 'string', 'max:100'],
         'date_of_birth' => ['nullable', 'date', 'before:today'],
         'gender' => ['nullable', Rule::in(array_keys(User::GENDERS))],
-        'phone' => ['nullable', 'string', 'max:30'],
+        'phone' => ['nullable', 'string', 'max:30', new AfghanPhone()],
         'address' => ['nullable', 'string', 'max:255'],
         'academic_rank' => ['nullable', 'required_if:role,teacher', Rule::in(array_keys(User::ACADEMIC_RANKS))],
         'education_degree' => ['nullable', 'required_if:role,teacher', Rule::in(array_keys(User::EDUCATION_DEGREES))],
@@ -293,6 +293,10 @@ private function prepareProfile(Request $request, array $data, ?User $user = nul
 {
     unset($data['photo'], $data['remove_photo']);
 
+    // The phone number is saved in one form: 07XXXXXXXX
+    if (array_key_exists('phone', $data)) {
+        $data['phone'] = AfghanPhone::normalize($data['phone']);
+    }
     if ($request->hasFile('photo')) {
         if ($user?->photo_path) {
             Storage::delete($user->photo_path);
